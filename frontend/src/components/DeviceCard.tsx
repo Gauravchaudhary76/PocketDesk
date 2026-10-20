@@ -42,20 +42,32 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
           </div>
         </div>
 
-        {/* Connect Action Button - Clearly marked as not yet functional */}
+        {/* Connect Action Button */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onAttemptConnect}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all shadow-md bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 hover:border-blue-500/50 cursor-pointer active:scale-98 group"
-            aria-label="Connect to Laptop (Planned for Stage 2 - Currently Inactive)"
-          >
-            <Power className="w-4 h-4 text-blue-400 group-hover:text-blue-300 transition-colors" />
-            <span>Connect</span>
-            <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-              Stage 2
-            </span>
-          </button>
+          {status === 'connected' ? (
+            <button
+              type="button"
+              onClick={onAttemptConnect}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all shadow-md bg-slate-900 hover:bg-rose-950/40 text-rose-300 border border-rose-800/40 cursor-pointer active:scale-98"
+              aria-label="Disconnect from Local Laptop Agent"
+            >
+              <Power className="w-4 h-4 text-rose-400" />
+              <span>Disconnect</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onAttemptConnect}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all shadow-md bg-blue-600 hover:bg-blue-500 text-white border border-blue-500 cursor-pointer active:scale-98 group"
+              aria-label="Connect to Local Laptop Agent (http://127.0.0.1:8000)"
+            >
+              <Power className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
+              <span>Connect to Agent</span>
+              <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-blue-800/60 text-blue-200 border border-blue-400/30">
+                :8000
+              </span>
+            </button>
+          )}
         </div>
       </div>
 

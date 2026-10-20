@@ -20,13 +20,13 @@ import {
 } from 'lucide-react';
 
 export const App: React.FC = () => {
-  // Connection status defaults to disconnected as required
+  // Connection status defaults to disconnected
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
 
   // Active navigation tab (useful for mobile phones & small viewports)
   const [activeTab, setActiveTab] = useState<ActiveTab>('display');
 
-  // Modal dialog state for explanatory notices on non-functional Stage 1 buttons
+  // Modal dialog state for explanatory notices on non-functional Stage 1/2 buttons
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     title: string;
@@ -36,24 +36,24 @@ export const App: React.FC = () => {
   }>({
     isOpen: false,
     title: '',
-    stageNumber: 1,
+    stageNumber: 2,
     description: '',
     details: [],
   });
 
-  // Mock paired laptop metadata
-  const pairedDevice: DeviceInfo = {
+  // Host device metadata (updates when connected to live agent)
+  const [pairedDevice, setPairedDevice] = useState<DeviceInfo>({
     id: 'dev_win11_laptop_01',
-    name: 'Dell XPS 15 (Windows 11)',
-    os: 'Windows 11 Pro 64-bit (23H2)',
-    hostname: 'DESKTOP-WIN11-WORK',
-    ipAddress: '192.168.1.145:8080',
-    batteryLevel: 94,
+    name: 'Windows Host (Local Agent)',
+    os: 'Windows 10 / 11 (Querying agent...)',
+    hostname: '127.0.0.1',
+    ipAddress: 'http://127.0.0.1:8000',
+    batteryLevel: 100,
     isCharging: true,
-    cpuModel: 'Intel Core i7-13700H @ 2.40GHz',
-    ramTotalGb: 32,
-    lastSeen: 'Just now (Prototype LAN)',
-  };
+    cpuModel: 'Intel / AMD x86_64',
+    ramTotalGb: 16,
+    lastSeen: 'Localhost only (Stage 2)',
+  });
 
   const handleOpenInfo = (
     stage: number,
@@ -70,18 +70,67 @@ export const App: React.FC = () => {
     });
   };
 
-  const handleAttemptConnect = () => {
-    handleOpenInfo(
-      2,
-      'Connect to Windows Host (Backend Handshake)',
-      'The "Connect" action will initiate a mutual TLS / WebSocket pairing handshake with the Python FastAPI backend on your laptop in Stage 2. It is intentionally inactive during this Stage 1 frontend prototype.',
-      [
-        'Stage 2 will launch a local Python FastAPI service listening on localhost:8080.',
-        'A secure ephemeral 6-digit PIN or QR code will authenticate your phone.',
-        'No remote access or exposed ports will be opened until full security checks are complete.',
-        'You can preview the Connecting and Error states using the state switcher in the top navigation bar.'
-      ]
-    );
+  const handleAttemptConnect = async () => {
+    if (connectionStatus === 'connected') {
+      setConnectionStatus('disconnected');
+      return;
+    }
+
+    setConnectionStatus('connecting');
+
+    try {
+      // Attempt live connection to local FastAPI agent
+      const healthRes = await fetch('http://127.0.0.1:8000/health', {
+        signal: AbortSignal.timeout(3000),
+      });
+
+      if (!healthRes.ok) {
+        throw new Error(`Agent health endpoint returned HTTP ${healthRes.status}`);
+      }
+
+      // Fetch live host telemetry
+      const sysRes = await fetch('http://127.0.0.1:8000/api/system', {
+        signal: AbortSignal.timeout(3000),
+      });
+
+      if (sysRes.ok) {
+        const sysData = await sysRes.json();
+        const ramGb = sysData.memory?.total_bytes
+          ? Math.round(sysData.memory.total_bytes / (1024 * 1024 * 1024))
+          : 16;
+
+        setPairedDevice({
+          id: 'dev_win_agent_local',
+          name: `${sysData.os?.hostname || 'Windows Host'} (PocketDesk Agent)`,
+          os: `${sysData.os?.system || 'Windows'} ${sysData.os?.release || ''} (${sysData.os?.architecture || ''})`,
+          hostname: sysData.os?.hostname || '127.0.0.1',
+          ipAddress: 'http://127.0.0.1:8000',
+          batteryLevel: sysData.battery?.percent !== null ? Math.round(sysData.battery?.percent ?? 100) : 100,
+          isCharging: Boolean(sysData.battery?.is_charging ?? sysData.battery?.power_plugged),
+          cpuModel: sysData.cpu?.model || 'Intel / AMD Host CPU',
+          ramTotalGb: ramGb,
+          lastSeen: 'Live Telemetry Active',
+        });
+      }
+
+      setConnectionStatus('connected');
+    } catch (err: unknown) {
+      setConnectionStatus('error');
+      handleOpenInfo(
+        2,
+        'Agent Unreachable on 127.0.0.1:8000',
+        'Could not reach the local PocketDesk agent at http://127.0.0.1:8000. Follow the steps below to start it.',
+        [
+          'Open PowerShell in the laptop-agent directory:',
+          '  cd C:\\Users\\gaura\\.gemini\\antigravity\\scratch\\pocketdesk\\laptop-agent',
+          'Activate the virtual environment:',
+          '  .\\.venv\\Scripts\\Activate.ps1',
+          'Start the agent service:',
+          '  python run.py',
+          'The agent will listen locally on http://127.0.0.1:8000'
+        ]
+      );
+    }
   };
 
   const tabs: { id: ActiveTab; label: string; icon: React.FC<{ className?: string }> }[] = [
@@ -103,7 +152,7 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Stage 1 Scope Announcement Banner */}
+        {/* Stage 2 Scope Announcement Banner */}
         <div className="bg-gradient-to-r from-blue-950/60 via-slate-900/80 to-indigo-950/60 border border-blue-900/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
           <div className="flex items-start gap-3">
             <div className="p-2.5 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400 shrink-0 mt-0.5">
@@ -112,14 +161,14 @@ export const App: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold text-white">
-                  Stage 1: Frontend Dashboard & Component Architecture
+                  Stage 2: Windows Laptop Agent Foundation (FastAPI)
                 </h2>
                 <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
                   Active Stage
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
-                This responsive dashboard establishes the UI foundation for PocketDesk. All buttons and interactive controls strictly adhere to Rule #6 and show explanatory notices regarding their planned backend stages.
+                The Python agent foundation is now implemented in <code className="text-blue-300 bg-slate-900 px-1 py-0.5 rounded">laptop-agent/</code> with <code className="text-blue-300 bg-slate-900 px-1 py-0.5 rounded">/health</code>, <code className="text-blue-300 bg-slate-900 px-1 py-0.5 rounded">/api/system</code>, and <code className="text-blue-300 bg-slate-900 px-1 py-0.5 rounded">/api/capabilities</code> endpoints bound strictly to localhost (127.0.0.1:8000).
               </p>
             </div>
           </div>
@@ -128,22 +177,21 @@ export const App: React.FC = () => {
             type="button"
             onClick={() =>
               handleOpenInfo(
-                1,
-                'Stage 1 Compliance & Verification',
-                'Stage 1 establishes the client-side architecture using React, Vite, TypeScript, and Tailwind CSS. No mock buttons pretend to perform actions. The Python backend and Windows agent will be developed in subsequent stages.',
+                2,
+                'Stage 2 Agent Specifications',
+                'Stage 2 delivers a robust local service without exposing remote control to the LAN or internet. Arbitrary execution and input control are strictly prohibited at this stage.',
                 [
-                  'Requirement A: Environment inspected (Node.js 22, npm 10, Python 3.13, Git).',
-                  'Requirement B: Frontend application initialized in /frontend.',
-                  'Requirement C: Dashboard with dark UI, device card, 16:9 preview, 4 feature sections, and multi-state simulator.',
-                  'Requirement D: Clean project structure accommodating frontend, backend, laptop-agent, and docs.',
-                  'Requirement E: Reusable typed components without bloated dependencies.',
-                  'Requirement F: Comprehensive root README.md documentation.'
+                  'GET /health: Semantic version, uptime, and operational health.',
+                  'GET /api/system: Hardware telemetry (OS, CPU cores/usage, RAM bytes, and battery).',
+                  'GET /api/capabilities: Feature inventory distinguishing available vs planned features.',
+                  'Local-only security: Binds strictly to 127.0.0.1 (Rule #10).',
+                  'Automated tests: 8 unit & integration tests passing with psutil mocks.'
                 ]
               )
             }
             className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 transition-colors"
           >
-            <span>Stage 1 Details</span>
+            <span>Stage 2 Details</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>

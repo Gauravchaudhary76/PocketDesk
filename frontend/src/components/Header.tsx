@@ -29,7 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
                 PocketDesk
               </h1>
               <span className="text-[10px] uppercase font-semibold tracking-wider px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                v0.1.0 • Stage 1
+                v0.2.0 • Stage 2
               </span>
             </div>
             <p className="text-xs text-slate-400 hidden sm:block">
@@ -71,6 +71,18 @@ export const Header: React.FC<HeaderProps> = ({
               title="Preview Connecting / Loading State"
             >
               Connecting
+            </button>
+            <button
+              type="button"
+              onClick={() => onStatusChange('connected')}
+              className={`px-2 py-1 rounded text-xs transition-colors ${
+                status === 'connected'
+                  ? 'bg-emerald-800/80 text-emerald-200 font-semibold'
+                  : 'text-slate-400 hover:text-emerald-300'
+              }`}
+              title="Preview Connected State"
+            >
+              Connected
             </button>
             <button
               type="button"

@@ -1,4 +1,4 @@
-export type ConnectionStatus = 'disconnected' | 'connecting' | 'error';
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 export interface DeviceInfo {
   id: string;

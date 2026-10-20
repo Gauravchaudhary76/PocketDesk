@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ConnectionStatus } from '../types';
-import { WifiOff, Loader2, AlertCircle } from 'lucide-react';
+import { WifiOff, Loader2, AlertCircle, Wifi } from 'lucide-react';
 
 interface StatusBadgeProps {
   status: ConnectionStatus;
@@ -12,6 +12,21 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   showIcon = true,
 }) => {
   switch (status) {
+    case 'connected':
+      return (
+        <span
+          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-950/70 text-emerald-300 border border-emerald-800/60 shadow-sm"
+          role="status"
+          aria-label="Status: Connected"
+        >
+          {showIcon && <Wifi className="w-3.5 h-3.5 text-emerald-400" />}
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            Agent Online
+          </span>
+        </span>
+      );
+
     case 'connecting':
       return (
         <span
