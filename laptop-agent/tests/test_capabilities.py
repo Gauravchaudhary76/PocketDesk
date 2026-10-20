@@ -25,14 +25,14 @@ def test_capabilities_endpoint(client):
 
     data = response.json()
     assert "agent_version" in data
-    assert data["current_stage"] == 3
+    assert data["current_stage"] == 4
     assert "capabilities" in data
     assert isinstance(data["capabilities"], list)
     assert len(data["capabilities"]) > 0
 
     cap_dict = {cap["name"]: cap for cap in data["capabilities"]}
 
-    # Verify Stage 2 & 3 available capabilities
+    # Verify Stage 2, 3 & 4 available capabilities
     assert "health_check" in cap_dict
     assert cap_dict["health_check"]["status"] == "available"
 
@@ -44,12 +44,14 @@ def test_capabilities_endpoint(client):
 
     assert "local_network_pairing" in cap_dict
     assert cap_dict["local_network_pairing"]["status"] == "available"
-    assert cap_dict["local_network_pairing"]["stage"] == 3
+
+    assert "screen_capture" in cap_dict
+    assert cap_dict["screen_capture"]["status"] == "available"
+
+    assert "screen_streaming" in cap_dict
+    assert cap_dict["screen_streaming"]["status"] == "available"
 
     # Verify future stage planned capabilities
-    assert "screen_capture" in cap_dict
-    assert cap_dict["screen_capture"]["status"] == "planned"
-
     assert "mouse_control" in cap_dict
     assert cap_dict["mouse_control"]["status"] == "planned"
 

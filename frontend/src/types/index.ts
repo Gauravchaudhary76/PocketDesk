@@ -83,3 +83,10 @@ export interface TransferFile {
 }
 
 export type ActiveTab = 'display' | 'controls' | 'files' | 'apps' | 'system';
+
+export type StreamResolution = '1080p' | '720p' | '540p' | '480p';
+
+export interface StreamConfig {
+  fps: number;
+  resolution: StreamResolution;
+}

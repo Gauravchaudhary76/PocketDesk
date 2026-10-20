@@ -35,15 +35,15 @@ REGISTERED_CAPABILITIES = [
     ),
     CapabilityItem(
         name="screen_capture",
-        status="planned",
-        stage=3,
-        description="DirectX Desktop Duplication API (DXGI) low-latency desktop capture (planned for future)."
+        status="available",
+        stage=4,
+        description="Real-time Windows desktop capture with resolution scaling and fallback support."
     ),
     CapabilityItem(
         name="screen_streaming",
-        status="planned",
-        stage=3,
-        description="Real-time WebRTC media streaming to client browser."
+        status="available",
+        stage=4,
+        description="Peer-to-peer WebRTC video transport with authenticated signaling."
     ),
     CapabilityItem(
         name="mouse_control",

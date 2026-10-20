@@ -9,8 +9,8 @@ def test_health_endpoint(client):
     data = response.json()
     assert data["status"] == "ok"
     assert "version" in data
-    assert data["version"] == "0.3.0"
-    assert data["stage"] == 3
+    assert data["version"] == "0.4.0"
+    assert data["stage"] == 4
     assert "uptime_seconds" in data
     assert isinstance(data["uptime_seconds"], (int, float))
     assert data["uptime_seconds"] >= 0.0

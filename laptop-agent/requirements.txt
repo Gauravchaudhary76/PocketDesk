@@ -4,3 +4,6 @@ pydantic>=2.10.0
 psutil>=6.1.0
 pytest>=8.3.0
 httpx>=0.28.0
+aiortc>=1.15.0
+mss>=10.2.0
+Pillow>=11.0.0

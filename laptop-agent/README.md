@@ -1,8 +1,8 @@
 # PocketDesk Laptop Agent (Windows 10/11)
 
-> **Status:** Stage 3 implemented. Supports local Wi-Fi device pairing and authenticated telemetry.
+> **Status:** Stage 4 implemented. Supports local Wi-Fi device pairing, live hardware telemetry, and authenticated WebRTC desktop screen streaming.
 
-The PocketDesk Laptop Agent is a lightweight Python service built on **FastAPI** that runs locally on your Windows 10 or 11 laptop. It provides terminal-authorized device pairing, system health reporting, and live hardware telemetry over your local Wi-Fi network.
+The PocketDesk Laptop Agent is a lightweight Python service built on **FastAPI** that runs locally on your Windows 10 or 11 laptop. It provides terminal-authorized device pairing, system health reporting, live hardware telemetry, and user-initiated WebRTC screen capture over your local Wi-Fi network.
 
 ---
 
@@ -15,6 +15,9 @@ The PocketDesk Laptop Agent is a lightweight Python service built on **FastAPI**
 | `POST` | `/api/unpair` | Revoke active session token | Bearer Token Required | `UnpairResponse` |
 | `GET` | `/api/system` | Host OS, CPU load, RAM allocation, and battery | Bearer Token Required | `SystemInfoResponse` |
 | `GET` | `/api/capabilities` | List of implemented vs planned features | Bearer Token Required | `CapabilitiesResponse` |
+| `POST` | `/api/stream/offer` | Authenticated WebRTC SDP offer/answer exchange | Bearer Token Required | `StreamAnswerResponse` |
+| `POST` | `/api/stream/stop` | Terminate active desktop screen streaming session | Bearer Token Required | `StreamStopResponse` |
+| `GET` | `/api/stream/status` | Inquire whether desktop capture is active | Bearer Token Required | `StreamStatusResponse` |
 | `GET` | `/` | Root agent index and interactive doc links | Unauthenticated | `dict` |
 | `GET` | `/docs` | Interactive Swagger API documentation | Unauthenticated | OpenAPI UI |
 
@@ -69,6 +72,13 @@ With your virtual environment activated, install all dependencies:
 pip install -r requirements.txt
 ```
 
+Installed core libraries:
+- `fastapi` & `uvicorn`: Web framework and ASGI server
+- `pydantic`: Schema validation
+- `psutil`: Hardware and OS telemetry
+- `aiortc` & `av`: Python WebRTC stack and PyAV media encoders
+- `mss` & `Pillow`: Multi-monitor desktop frame capture and bilinear downsampling
+
 ---
 
 ## Windows Firewall Configuration (Safe Procedure)
@@ -105,7 +115,7 @@ python run.py --lan
 When started, the terminal output will show:
 ```
 ==================================================
-  PocketDesk Laptop Agent v0.3.0 (Stage 3)
+  PocketDesk Laptop Agent v0.4.0 (Stage 4)
   Mode: Local Wi-Fi Network Access enabled
   Listening on all interfaces: http://0.0.0.0:8000
   Phone Connection URL: http://192.168.1.145:8000
@@ -122,25 +132,27 @@ python run.py
 
 ---
 
-## Pairing & Authentication Architecture
+## Stage 4 Screen Sharing Indicator & Session Control
 
-In Stage 3, PocketDesk enforces a physical pairing authorization workflow:
+In Stage 4, desktop capture **starts strictly upon explicit user command from an authenticated client**:
 
-1. **Terminal PIN Authorization:**
-   - Every time the agent starts, a cryptographically random 6-digit numeric PIN (`secrets.randbelow(1000000)`) is generated and logged only on the laptop terminal.
-   - A client must send `POST /api/pair` with this PIN to obtain a session token.
+1. **Laptop Terminal Notice:**
+   Whenever a screen sharing session is initiated by the web client, the laptop terminal prominently displays:
+   ```
+   ==================================================
+   [SCREEN SHARING ACTIVE] PocketDesk Web Client is viewing this desktop!
+   Active resolution: 720p @ 20 FPS
+   To stop screen sharing, press Stop on phone or call POST /api/stream/stop
+   ==================================================
+   ```
 
-2. **Bearer Token Authentication:**
-   - Successful pairing returns a 256-bit cryptographically secure session token (`secrets.token_hex(32)`).
-   - Subsequent calls to `/api/system` and `/api/capabilities` require `Authorization: Bearer <session_token>`.
+2. **Terminating Screen Sharing:**
+   - **From the phone:** Tap **"Stop Sharing"** in the video player overlay.
+   - **From the laptop:** Send `POST /api/stream/stop` with the Bearer session token.
+   - **On Agent Shutdown:** When the agent is closed (`Ctrl + C`), the FastAPI lifespan hook automatically terminates the WebRTC track and releases the screen capture context cleanly.
 
-3. **Protection Mechanisms:**
-   - Sensitive tokens are stored in memory and `sessionStorage` on the client. They are **never** passed in URL query parameters, never printed in browser console logs, and never committed to source control.
-   - Brute-force protection: After 5 incorrect pairing attempts, the agent locks out pairing for 30 seconds.
-
-4. **Narrow CORS Policy:**
-   - CORS is restricted to localhost (`127.0.0.1`) and private RFC1918 subnets (`192.168.*.*`, `10.*.*.*`, `172.16-31.*.*`).
-   - Unrestricted origins (`*`) are disallowed.
+3. **Fallback & Headless Capture Safety:**
+   If the screen is locked or running in a headless/power-saving state where Windows GDI prevents screen grabbing, the stream track generates a synthetic fallback frame informing the viewer rather than crashing.
 
 ---
 
@@ -148,10 +160,11 @@ In Stage 3, PocketDesk enforces a physical pairing authorization workflow:
 
 > [!WARNING]
 > **Plaintext HTTP Notice:**
-> In this Stage 3 local prototype, communication occurs over unencrypted HTTP.
+> In this Stage 4 local prototype, initial signaling and telemetry communication occurs over unencrypted HTTP.
 > Ordinary HTTP traffic is **not suitable for transmitting credentials or enabling remote control across untrusted networks** (such as public coffee shop Wi-Fi or the open internet), as packets can be intercepted or manipulated.
 > 
 > PocketDesk must only be used on a trusted home Wi-Fi network during this stage.
+> Zero video frames are routed to external cloud relays (`iceServers: []`).
 > Before any remote internet access is introduced (Stage 6), PocketDesk will mandate encrypted transport (TLS/HTTPS certificates and WebRTC DTLS-SRTP end-to-end encryption).
 
 ---
@@ -162,15 +175,12 @@ In Stage 3, PocketDesk enforces a physical pairing authorization workflow:
 ```powershell
 .\.venv\Scripts\pytest.exe -v
 ```
-All 15 automated unit and integration tests will verify pairing, brute-force protection, token revocation, system telemetry, and mock scenarios.
+All 19 automated unit and integration tests will verify signaling, track rendering, pairing, brute-force protection, token revocation, system telemetry, and mock scenarios.
 
 ### 2. Manual CLI Testing with PowerShell
 ```powershell
 # Check health
 Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" | ConvertTo-Json
-
-# Attempting /api/system without token will fail with 401:
-try { Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/system" } catch { $_.Exception.Response.StatusCode }
 
 # Pair using the PIN shown on your terminal:
 $pair = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/pair" -Method POST -Body '{"pairing_code":"<YOUR_PIN>"}' -ContentType "application/json"
@@ -178,18 +188,21 @@ $token = $pair.session_token
 
 # Access telemetry with Bearer token:
 Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/system" -Headers @{ Authorization = "Bearer $token" } | ConvertTo-Json -Depth 4
+
+# Check streaming status:
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/stream/status" -Headers @{ Authorization = "Bearer $token" } | ConvertTo-Json
 ```
 
 ---
 
 ## Stopping the Agent
 
-Press `Ctrl + C` in the PowerShell window running the agent. Uvicorn will cleanly terminate active sessions and exit.
+Press `Ctrl + C` in the PowerShell window running the agent. Uvicorn will cleanly terminate active WebRTC sessions and exit.
 
 ---
 
-## Known Limitations (Stage 3 Scope)
+## Known Limitations (Stage 4 Scope)
 
-- **No Remote Desktop Video:** Desktop video capture via DXGI/WebRTC is not implemented in Stage 3.
-- **No Mouse/Keyboard Control:** Synthetic mouse and keyboard injection are disabled in this stage.
+- **No Mouse/Keyboard Control:** Synthetic mouse and keyboard injection are disabled in this stage (scheduled for Stage 5).
+- **No File Transfer:** File transfer queue is disabled in this stage (scheduled for Stage 5).
 - **No Internet Access:** Connections must be within the same private local Wi-Fi subnet.

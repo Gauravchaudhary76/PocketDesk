@@ -29,7 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
                 PocketDesk
               </h1>
               <span className="text-[10px] uppercase font-semibold tracking-wider px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                v0.3.0 • Stage 3
+                v0.4.0 • Stage 4
               </span>
             </div>
             <p className="text-xs text-slate-400 hidden sm:block">
@@ -103,15 +103,15 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             onClick={() =>
               onOpenStageInfo(
-                1,
+                4,
                 'PocketDesk Architecture & Stage Roadmap',
-                'PocketDesk is built incrementally following strict engineering rules. Stage 1 delivers the frontend prototype, component architecture, and responsive dark UI. No unverified backend or remote access services are active yet.',
+                'PocketDesk is built incrementally following strict engineering rules. Stage 4 delivers authenticated local WebRTC desktop video streaming with configurable resolution/FPS and laptop terminal indicators.',
                 [
-                  'Stage 1: Frontend Prototype, UI Dashboard & Architecture (Current)',
-                  'Stage 2: Python FastAPI Backend & Pairing Handshake',
-                  'Stage 3: Windows Laptop Agent & Real-time Screen Streaming',
-                  'Stage 4: Low-latency Input Dispatch (Mouse, Keyboard, Touch)',
-                  'Stage 5: Secure Chunked File Transfer & Process Management',
+                  'Stage 1: Frontend Prototype, UI Dashboard & Responsive Layout (Completed)',
+                  'Stage 2: Python FastAPI Agent Foundation & Local Telemetry (Completed)',
+                  'Stage 3: Local Network Device Pairing & Authenticated Handshake (Completed)',
+                  'Stage 4: Authenticated WebRTC Desktop Video Streaming (Current Stage)',
+                  'Stage 5: Low-latency Input Dispatch (Mouse, Keyboard, Touch)',
                   'Stage 6: Encrypted WebRTC / NAT Traversal for Remote Internet Access',
                 ]
               )

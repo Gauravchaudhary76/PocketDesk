@@ -3,5 +3,12 @@ from app.routers.health import router as health_router
 from app.routers.system import router as system_router
 from app.routers.capabilities import router as capabilities_router
 from app.routers.auth import router as auth_router
+from app.routers.stream import router as stream_router
 
-__all__ = ["health_router", "system_router", "capabilities_router", "auth_router"]
+__all__ = [
+    "health_router",
+    "system_router",
+    "capabilities_router",
+    "auth_router",
+    "stream_router",
+]

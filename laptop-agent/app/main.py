@@ -9,8 +9,15 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.logger import setup_logging
-from app.routers import auth_router, capabilities_router, health_router, system_router
+from app.routers import (
+    auth_router,
+    capabilities_router,
+    health_router,
+    stream_router,
+    system_router,
+)
 from app.services.auth import AuthService
+from app.services.stream import StreamManager
 
 # Setup application logging
 setup_logging()
@@ -21,24 +28,26 @@ logger = logging.getLogger("pocketdesk.agent")
 async def lifespan(app: FastAPI):
     """Application lifecycle manager."""
     app.state.start_time = time.time()
-    
+
     # Run security validation & display network endpoints
     settings.validate_security()
-    
+
     # Ensure a pairing PIN is initialized and displayed
     AuthService.get_active_code()
-    
+
     yield
-    
-    logger.info("Shutting down %s...", settings.APP_NAME)
+
+    logger.info("Cleaning up active streams and shutting down %s...", settings.APP_NAME)
+    await StreamManager.stop_stream()
+    logger.info("Shutdown complete.")
 
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description=(
-        "PocketDesk Windows Laptop Agent (Stage 3). "
-        "Provides authenticated local network system telemetry and device pairing."
+        "PocketDesk Windows Laptop Agent (Stage 4). "
+        "Provides authenticated local network system telemetry and WebRTC desktop screen streaming."
     ),
     lifespan=lifespan,
     docs_url="/docs",
@@ -88,6 +97,7 @@ async def root():
         "pair": "/api/pair",
         "system": "/api/system",
         "capabilities": "/api/capabilities",
+        "stream_status": "/api/stream/status",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -97,3 +107,4 @@ app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(system_router)
 app.include_router(capabilities_router)
+app.include_router(stream_router)

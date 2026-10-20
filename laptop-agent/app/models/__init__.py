@@ -3,6 +3,12 @@ from app.models.health import HealthResponse
 from app.models.system import SystemInfoResponse, OSInfo, CPUInfo, MemoryInfo, BatteryInfo
 from app.models.capabilities import CapabilitiesResponse, CapabilityItem
 from app.models.auth import PairRequest, PairResponse, UnpairResponse
+from app.models.stream import (
+    StreamOfferRequest,
+    StreamAnswerResponse,
+    StreamStopResponse,
+    StreamStatusResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -16,4 +22,8 @@ __all__ = [
     "PairRequest",
     "PairResponse",
     "UnpairResponse",
+    "StreamOfferRequest",
+    "StreamAnswerResponse",
+    "StreamStopResponse",
+    "StreamStatusResponse",
 ]
