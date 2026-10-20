@@ -90,3 +90,21 @@ export interface StreamConfig {
   fps: number;
   resolution: StreamResolution;
 }
+
+export type InputMode = 'touch' | 'trackpad';
+
+export interface ScreenDimensions {
+  width: number;
+  height: number;
+  aspect_ratio: number;
+  input_enabled: boolean;
+}
+
+export interface InputStatus {
+  enabled: boolean;
+  authorized_client: string | null;
+  held_keys_count: number;
+  held_buttons_count: number;
+  screen_width: number;
+  screen_height: number;
+}

@@ -10,8 +10,8 @@ class Settings:
     """Application configuration for PocketDesk Laptop Agent."""
 
     APP_NAME: str = "PocketDesk Laptop Agent"
-    APP_VERSION: str = "0.4.0"
-    STAGE: int = 4
+    APP_VERSION: str = "0.5.0"
+    STAGE: int = 5
 
     # Binding Configuration (Default: 127.0.0.1; use 0.0.0.0 or --lan for Wi-Fi access)
     HOST: str = os.getenv("POCKETDESK_HOST", "127.0.0.1")

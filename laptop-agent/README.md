@@ -1,8 +1,8 @@
 # PocketDesk Laptop Agent (Windows 10/11)
 
-> **Status:** Stage 4 implemented. Supports local Wi-Fi device pairing, live hardware telemetry, and authenticated WebRTC desktop screen streaming.
+> **Status:** Stage 5 implemented. Supports local Wi-Fi device pairing, live hardware telemetry, WebRTC desktop screen streaming, and authenticated remote mouse and keyboard control.
 
-The PocketDesk Laptop Agent is a lightweight Python service built on **FastAPI** that runs locally on your Windows 10 or 11 laptop. It provides terminal-authorized device pairing, system health reporting, live hardware telemetry, and user-initiated WebRTC screen capture over your local Wi-Fi network.
+The PocketDesk Laptop Agent is a lightweight Python service built on **FastAPI** that runs locally on your Windows 10 or 11 laptop. It provides terminal-authorized device pairing, system health reporting, live hardware telemetry, user-initiated WebRTC screen capture, and safe Win32 mouse/keyboard injection over your local Wi-Fi network.
 
 ---
 
@@ -18,104 +18,41 @@ The PocketDesk Laptop Agent is a lightweight Python service built on **FastAPI**
 | `POST` | `/api/stream/offer` | Authenticated WebRTC SDP offer/answer exchange | Bearer Token Required | `StreamAnswerResponse` |
 | `POST` | `/api/stream/stop` | Terminate active desktop screen streaming session | Bearer Token Required | `StreamStopResponse` |
 | `GET` | `/api/stream/status` | Inquire whether desktop capture is active | Bearer Token Required | `StreamStatusResponse` |
-| `GET` | `/` | Root agent index and interactive doc links | Unauthenticated | `dict` |
-| `GET` | `/docs` | Interactive Swagger API documentation | Unauthenticated | OpenAPI UI |
+| `GET` | `/api/input/status` | Inquire whether remote input is currently authorized | Bearer Token Required | `InputStatusResponse` |
+| `GET` | `/api/input/screen-info`| Primary display pixel dimensions & aspect ratio | Bearer Token Required | `ScreenInfoResponse` |
+| `POST` | `/api/input/control` | Explicitly enable, disable, or emergency stop input | Bearer Token Required | `InputOperationResponse` |
+| `POST` | `/api/input/mouse/move` | Move mouse to normalized coordinates `[0.0, 1.0]` | Bearer Token Required | `InputOperationResponse` |
+| `POST` | `/api/input/mouse/relative` | Move mouse relative to current position (`dx`, `dy`) | Bearer Token Required | `InputOperationResponse` |
+| `POST` | `/api/input/mouse/click`| Dispatch mouse button click, down, or up | Bearer Token Required | `InputOperationResponse` |
+| `POST` | `/api/input/mouse/scroll` | Dispatch vertical wheel scroll | Bearer Token Required | `InputOperationResponse` |
+| `POST` | `/api/input/keyboard/key` | Press, hold down, or release virtual key | Bearer Token Required | `InputOperationResponse` |
+| `POST` | `/api/input/keyboard/text`| Type Unicode string into active window | Bearer Token Required | `InputOperationResponse` |
+| `POST` | `/api/input/keyboard/shortcut`| Execute multi-key combination (e.g. `['ctrl', 'c']`) | Bearer Token Required | `InputOperationResponse` |
+| `WS` | `/api/input/ws` | Low-latency bi-directional WebSocket input stream | Token Query / Auth Packet | WebSocket Stream |
 
 ---
 
-## Prerequisites
+## Operating System Limitations (Windows UIPI / UAC)
 
-- **Operating System:** Windows 10 or Windows 11 (64-bit)
-- **Python:** Python 3.10+ (Verified on `Python 3.13.3`)
-- **PowerShell:** PowerShell 5.1+ or PowerShell 7+
-- **Network:** Laptop and phone connected to the same trusted Wi-Fi router / subnet.
-
----
-
-## Virtual Environment Setup on Windows
-
-### 1. Open PowerShell and Navigate to the Directory
-```powershell
-cd C:\Users\gaura\.gemini\antigravity\scratch\pocketdesk\laptop-agent
-```
-
-### 2. Create the Python Virtual Environment
-```powershell
-python -m venv .venv
-```
-
-### 3. Activate the Virtual Environment
-Depending on your shell:
-
-**PowerShell:**
-```powershell
-# If execution policy prevents script activation, run:
-# Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
-
-.\.venv\Scripts\Activate.ps1
-```
-
-**Command Prompt (cmd.exe):**
-```cmd
-.venv\Scripts\activate.bat
-```
-
-Once activated, your terminal prompt will show `(.venv)`.
-
----
-
-## Installing Dependencies
-
-With your virtual environment activated, install all dependencies:
-
-```powershell
-pip install -r requirements.txt
-```
-
-Installed core libraries:
-- `fastapi` & `uvicorn`: Web framework and ASGI server
-- `pydantic`: Schema validation
-- `psutil`: Hardware and OS telemetry
-- `aiortc` & `av`: Python WebRTC stack and PyAV media encoders
-- `mss` & `Pillow`: Multi-monitor desktop frame capture and bilinear downsampling
-
----
-
-## Windows Firewall Configuration (Safe Procedure)
-
-To allow your phone to connect to the agent on port 8000 over your local Wi-Fi, you must allow inbound traffic on port 8000 for **Private** networks.
-
-> [!CAUTION]
-> **Never disable Windows Firewall.** Do not run commands like `Set-NetFirewallProfile -Enabled False`. Only create specific, port-scoped rules.
-
-### 1. Add Inbound Rule (Run PowerShell as Administrator)
-```powershell
-New-NetFirewallRule -DisplayName "PocketDesk Agent (Port 8000)" -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow -Profile Private
-```
-
-### 2. Verify the Rule
-```powershell
-Get-NetFirewallRule -DisplayName "PocketDesk Agent (Port 8000)"
-```
-
-### 3. Remove the Rule When Testing is Finished
-```powershell
-Remove-NetFirewallRule -DisplayName "PocketDesk Agent (Port 8000)"
-```
+> [!IMPORTANT]
+> **Windows User Interface Privilege Isolation (UIPI) & Secure Desktop Restrictions:**
+> 1. **Elevated Windows:** If a window on the Windows laptop is running as Administrator (elevated), Windows kernel security blocks non-elevated applications from sending synthetic input to it.
+> 2. **Secure Desktop (UAC & Ctrl+Alt+Del):** When a User Account Control prompt appears ("Do you want to allow this app to make changes...") or when the Windows Lock/Login screen is active, Windows shifts to the isolated Secure Desktop. Standard non-elevated user processes cannot inject keystrokes or mouse clicks into this screen.
+> 3. **Remediation:** To control elevated windows remotely, start the laptop agent by opening PowerShell with **"Run as Administrator"**.
 
 ---
 
 ## Starting the Agent
 
-### Local Wi-Fi Access Mode (Recommended for Phone Testing):
+### Local Wi-Fi Access Mode:
 ```powershell
 python run.py --lan
 ```
 
-When started, the terminal output will show:
+Terminal output:
 ```
 ==================================================
-  PocketDesk Laptop Agent v0.4.0 (Stage 4)
+  PocketDesk Laptop Agent v0.5.0 (Stage 5)
   Mode: Local Wi-Fi Network Access enabled
   Listening on all interfaces: http://0.0.0.0:8000
   Phone Connection URL: http://192.168.1.145:8000
@@ -125,47 +62,30 @@ When started, the terminal output will show:
 ==================================================
 ```
 
-### Localhost-Only Mode (Testing on Laptop Browser):
-```powershell
-python run.py
-```
-
 ---
 
-## Stage 4 Screen Sharing Indicator & Session Control
+## Stage 5 Input Security Model & Controls
 
-In Stage 4, desktop capture **starts strictly upon explicit user command from an authenticated client**:
+1. **Explicit Enablement:**
+   Remote input is **disabled by default**. It requires explicit user activation from the authenticated client via `POST /api/input/control` with `{"action": "enable"}`.
 
-1. **Laptop Terminal Notice:**
-   Whenever a screen sharing session is initiated by the web client, the laptop terminal prominently displays:
+2. **Laptop Terminal Notice:**
+   When remote input is enabled, the laptop terminal outputs:
    ```
-   ==================================================
-   [SCREEN SHARING ACTIVE] PocketDesk Web Client is viewing this desktop!
-   Active resolution: 720p @ 20 FPS
-   To stop screen sharing, press Stop on phone or call POST /api/stream/stop
-   ==================================================
+   ==============================================================
+   [INPUT CONTROL ENABLED] Client 'PocketDesk Web Client' authorized for mouse/keyboard!
+   Emergency Stop: POST http://127.0.0.1:8000/api/input/control
+   ==============================================================
    ```
 
-2. **Terminating Screen Sharing:**
-   - **From the phone:** Tap **"Stop Sharing"** in the video player overlay.
-   - **From the laptop:** Send `POST /api/stream/stop` with the Bearer session token.
-   - **On Agent Shutdown:** When the agent is closed (`Ctrl + C`), the FastAPI lifespan hook automatically terminates the WebRTC track and releases the screen capture context cleanly.
+3. **Immediate Emergency Stop:**
+   Calling `POST /api/input/control` with `{"action": "emergency_stop"}` or tapping "Emergency Disable" in the web UI immediately halts input and releases all held mouse buttons and keys.
 
-3. **Fallback & Headless Capture Safety:**
-   If the screen is locked or running in a headless/power-saving state where Windows GDI prevents screen grabbing, the stream track generates a synthetic fallback frame informing the viewer rather than crashing.
+4. **Stuck Key Protection:**
+   The service maintains an in-memory registry of all currently held virtual keys and mouse buttons. Whenever a client disconnects, unpairs, or the agent shuts down, `emergency_cleanup()` is automatically executed to prevent stuck modifier keys.
 
----
-
-## Security & Network Assumptions (Requirement 8)
-
-> [!WARNING]
-> **Plaintext HTTP Notice:**
-> In this Stage 4 local prototype, initial signaling and telemetry communication occurs over unencrypted HTTP.
-> Ordinary HTTP traffic is **not suitable for transmitting credentials or enabling remote control across untrusted networks** (such as public coffee shop Wi-Fi or the open internet), as packets can be intercepted or manipulated.
-> 
-> PocketDesk must only be used on a trusted home Wi-Fi network during this stage.
-> Zero video frames are routed to external cloud relays (`iceServers: []`).
-> Before any remote internet access is introduced (Stage 6), PocketDesk will mandate encrypted transport (TLS/HTTPS certificates and WebRTC DTLS-SRTP end-to-end encryption).
+5. **Rate Limiting & Anti-Flood:**
+   The agent enforces an upper limit of 150 events per second and drops stale packets older than 1.5 seconds.
 
 ---
 
@@ -175,34 +95,43 @@ In Stage 4, desktop capture **starts strictly upon explicit user command from an
 ```powershell
 .\.venv\Scripts\pytest.exe -v
 ```
-All 19 automated unit and integration tests will verify signaling, track rendering, pairing, brute-force protection, token revocation, system telemetry, and mock scenarios.
+All 28 automated tests verify:
+- Coordinate mapping and letterbox boundary clamping
+- Input validation (rejection of malformed coordinates, unwhitelisted keys, oversized text payloads)
+- Authentication enforcement on all input endpoints (401 Unauthorized)
+- Permission gating (403 Forbidden when remote input is disabled)
+- Explicit input enable / disable / emergency stop lifecycle
+- Automatic key and mouse button release during cleanup
+- WebRTC SDP offer/answer signaling exchange (`/api/stream/offer`)
+- Pairing authorization & lockout protection
 
 ### 2. Manual CLI Testing with PowerShell
 ```powershell
-# Check health
+# 1. Check health
 Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" | ConvertTo-Json
 
-# Pair using the PIN shown on your terminal:
+# 2. Pair using PIN:
 $pair = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/pair" -Method POST -Body '{"pairing_code":"<YOUR_PIN>"}' -ContentType "application/json"
 $token = $pair.session_token
 
-# Access telemetry with Bearer token:
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/system" -Headers @{ Authorization = "Bearer $token" } | ConvertTo-Json -Depth 4
+# 3. Enable remote input:
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/input/control" -Method POST -Headers @{ Authorization = "Bearer $token" } -Body '{"action":"enable"}' -ContentType "application/json"
 
-# Check streaming status:
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/stream/status" -Headers @{ Authorization = "Bearer $token" } | ConvertTo-Json
+# 4. Check display info:
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/input/screen-info" -Headers @{ Authorization = "Bearer $token" } | ConvertTo-Json
+
+# 5. Move mouse to screen center:
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/input/mouse/move" -Method POST -Headers @{ Authorization = "Bearer $token" } -Body '{"x":0.5,"y":0.5}' -ContentType "application/json"
+
+# 6. Type text into active window:
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/input/keyboard/text" -Method POST -Headers @{ Authorization = "Bearer $token" } -Body '{"text":"Hello from PocketDesk!"}' -ContentType "application/json"
+
+# 7. Disable input:
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/input/control" -Method POST -Headers @{ Authorization = "Bearer $token" } -Body '{"action":"disable"}' -ContentType "application/json"
 ```
 
 ---
 
 ## Stopping the Agent
 
-Press `Ctrl + C` in the PowerShell window running the agent. Uvicorn will cleanly terminate active WebRTC sessions and exit.
-
----
-
-## Known Limitations (Stage 4 Scope)
-
-- **No Mouse/Keyboard Control:** Synthetic mouse and keyboard injection are disabled in this stage (scheduled for Stage 5).
-- **No File Transfer:** File transfer queue is disabled in this stage (scheduled for Stage 5).
-- **No Internet Access:** Connections must be within the same private local Wi-Fi subnet.
+Press `Ctrl + C` in the PowerShell window running the agent. Uvicorn will cleanly terminate active WebRTC sessions, release any held keys or mouse buttons, and exit.

@@ -13,10 +13,12 @@ from app.routers import (
     auth_router,
     capabilities_router,
     health_router,
+    input_router,
     stream_router,
     system_router,
 )
 from app.services.auth import AuthService
+from app.services.input import InputService
 from app.services.stream import StreamManager
 
 # Setup application logging
@@ -37,7 +39,8 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    logger.info("Cleaning up active streams and shutting down %s...", settings.APP_NAME)
+    logger.info("Cleaning up active streams, disabling remote input, and shutting down %s...", settings.APP_NAME)
+    InputService.disable_input()
     await StreamManager.stop_stream()
     logger.info("Shutdown complete.")
 
@@ -46,8 +49,8 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description=(
-        "PocketDesk Windows Laptop Agent (Stage 4). "
-        "Provides authenticated local network system telemetry and WebRTC desktop screen streaming."
+        "PocketDesk Windows Laptop Agent (Stage 5). "
+        "Provides authenticated local network system telemetry, WebRTC desktop screen streaming, and remote mouse/keyboard control."
     ),
     lifespan=lifespan,
     docs_url="/docs",
@@ -98,6 +101,7 @@ async def root():
         "system": "/api/system",
         "capabilities": "/api/capabilities",
         "stream_status": "/api/stream/status",
+        "input_status": "/api/input/status",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -108,3 +112,4 @@ app.include_router(auth_router)
 app.include_router(system_router)
 app.include_router(capabilities_router)
 app.include_router(stream_router)
+app.include_router(input_router)

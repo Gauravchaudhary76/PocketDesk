@@ -10,6 +10,7 @@ import { SystemMonitorSection } from './components/SystemMonitorSection';
 import { ConnectModal } from './components/ConnectModal';
 import { InfoModal } from './components/InfoModal';
 import { streamClient } from './services/webrtc';
+import { inputClient } from './services/input';
 import {
   Monitor,
   Mouse,
@@ -19,7 +20,10 @@ import {
   ChevronRight,
   Info,
   Wifi,
-  Tv
+  Hand,
+  ShieldCheck,
+  ShieldAlert,
+  Power
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -57,6 +61,11 @@ export const App: React.FC = () => {
   const [webrtcState, setWebrtcState] = useState<RTCPeerConnectionState | 'disconnected'>('disconnected');
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
+  // Remote Input Control State (Stage 5)
+  const [isInputEnabled, setIsInputEnabled] = useState<boolean>(false);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState<boolean>(false);
+  const [confirmInputModalOpen, setConfirmInputModalOpen] = useState<boolean>(false);
+
   // Modals
   const [isConnectModalOpen, setIsConnectModalOpen] = useState<boolean>(false);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
@@ -69,7 +78,7 @@ export const App: React.FC = () => {
   }>({
     isOpen: false,
     title: '',
-    stageNumber: 4,
+    stageNumber: 5,
     description: '',
     details: [],
   });
@@ -124,10 +133,12 @@ export const App: React.FC = () => {
           setConnectionStatus('disconnected');
           setSystemInfo(null);
           setIsStreaming(false);
+          setIsInputEnabled(false);
+          inputClient.disableInput(url, token).catch(() => {});
           handleOpenInfo(
-            4,
+            5,
             'Session Expired or Revoked',
-            'Your session token has expired or was revoked by the laptop agent. Please reconnect and enter the pairing PIN shown on your laptop terminal.',
+            'Your session token has expired or was revoked by the laptop agent. Remote input and screen streaming have been safely terminated.',
             [
               'Local sessions are automatically invalidated upon agent restart',
               'Tokens expire after 4 hours of inactivity',
@@ -166,10 +177,10 @@ export const App: React.FC = () => {
         return true;
       } catch {
         consecutiveFailuresRef.current += 1;
-        // If 2 consecutive failures occur, mark error
         if (consecutiveFailuresRef.current >= 2) {
           setConnectionStatus('error');
           setIsStreaming(false);
+          setIsInputEnabled(false);
         }
         return false;
       }
@@ -190,18 +201,24 @@ export const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [connectionStatus, sessionToken, agentUrl, fetchTelemetry]);
 
-  // Clean up WebRTC session when browser tab is refreshed or closed
+  // Clean up WebRTC session & input state when browser tab is refreshed or closed
   useEffect(() => {
     const handleBeforeUnload = () => {
       streamClient.stopStream();
+      if (agentUrl && sessionToken) {
+        inputClient.disableInput(agentUrl, sessionToken);
+      }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       streamClient.stopStream();
+      if (agentUrl && sessionToken) {
+        inputClient.disableInput(agentUrl, sessionToken);
+      }
     };
-  }, []);
+  }, [agentUrl, sessionToken]);
 
   // WebRTC Stream Control: Start Screen Sharing
   const handleStartStream = async () => {
@@ -263,6 +280,77 @@ export const App: React.FC = () => {
     setIsStreaming(false);
     setIsStartingStream(false);
     setWebrtcState('disconnected');
+  };
+
+  // Remote Input Controls (Stage 5)
+  const handleToggleInput = (enable: boolean) => {
+    if (enable) {
+      // Request explicit confirmation before enabling remote input
+      setConfirmInputModalOpen(true);
+    } else {
+      // Immediate emergency stop
+      handleEmergencyDisableInput();
+    }
+  };
+
+  const handleConfirmEnableInput = async () => {
+    if (!agentUrl || !sessionToken) return;
+    try {
+      await inputClient.enableInput(agentUrl, sessionToken);
+      setIsInputEnabled(true);
+      setConfirmInputModalOpen(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to enable remote input';
+      alert(msg);
+    }
+  };
+
+  const handleEmergencyDisableInput = async () => {
+    if (agentUrl && sessionToken) {
+      await inputClient.disableInput(agentUrl, sessionToken);
+    }
+    setIsInputEnabled(false);
+    setIsKeyboardOpen(false);
+  };
+
+  const handleMouseMove = (normX: number, normY: number) => {
+    if (!isInputEnabled) return;
+    inputClient.sendMouseMove(normX, normY);
+  };
+
+  const handleMouseMoveRelative = (dx: number, dy: number) => {
+    if (!isInputEnabled) return;
+    inputClient.sendMouseRelative(dx, dy);
+  };
+
+  const handleMouseClick = (
+    button: 'left' | 'right' | 'middle',
+    action: 'click' | 'double_click' | 'down' | 'up' = 'click',
+    normX?: number,
+    normY?: number
+  ) => {
+    if (!isInputEnabled) return;
+    inputClient.sendMouseClick(button, action, normX, normY);
+  };
+
+  const handleMouseScroll = (deltaY: number) => {
+    if (!isInputEnabled) return;
+    inputClient.sendMouseScroll(deltaY);
+  };
+
+  const handleSendKey = (key: string, action: 'press' | 'down' | 'up' = 'press') => {
+    if (!isInputEnabled) return;
+    inputClient.sendKey(key, action);
+  };
+
+  const handleSendText = (text: string) => {
+    if (!isInputEnabled) return;
+    inputClient.sendText(text);
+  };
+
+  const handleSendShortcut = (keys: string[]) => {
+    if (!isInputEnabled) return;
+    inputClient.sendShortcut(keys);
   };
 
   // Initiate connection & pairing workflow
@@ -334,7 +422,8 @@ export const App: React.FC = () => {
 
   // Disconnect & revoke session
   const handleDisconnect = async () => {
-    // Terminate stream if active
+    // Terminate input and stream
+    await handleEmergencyDisableInput();
     await handleStopStream();
 
     if (sessionToken && agentUrl) {
@@ -394,24 +483,29 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Stage 4 Scope Announcement Banner */}
+        {/* Stage 5 Scope Announcement Banner */}
         <div className="bg-gradient-to-r from-blue-950/60 via-slate-900/80 to-indigo-950/60 border border-blue-900/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
           <div className="flex items-start gap-3">
             <div className="p-2.5 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400 shrink-0 mt-0.5">
-              <Tv className="w-5 h-5" />
+              <Hand className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold text-white flex items-center gap-1.5">
                   <Wifi className="w-4 h-4 text-emerald-400" />
-                  Stage 4: Local WebRTC Desktop Screen Streaming
+                  Stage 5: Remote Mouse & Keyboard Control
                 </h2>
-                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   Active Stage
                 </span>
+                {isInputEnabled && (
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                    INPUT ACTIVE
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
-                Stream your Windows 10/11 desktop directly to your mobile browser over local Wi-Fi. Screen capture begins only upon your explicit command, prints <code className="text-emerald-400 font-mono">[SCREEN SHARING ACTIVE]</code> on your laptop, and can be stopped at any time from both phone and laptop.
+                Interact with your Windows 10/11 laptop directly via touch gestures on the streamed display, virtual on-screen keyboard, or dedicated trackpad. Remote input requires explicit enablement and can be terminated instantly with the Emergency Stop button.
               </p>
             </div>
           </div>
@@ -428,26 +522,49 @@ export const App: React.FC = () => {
               </button>
             )}
 
+            {connectionStatus === 'connected' && (
+              isInputEnabled ? (
+                <button
+                  type="button"
+                  onClick={handleEmergencyDisableInput}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-900/40 transition-all cursor-pointer"
+                  title="Immediately disable remote input"
+                >
+                  <Power className="w-3.5 h-3.5" />
+                  <span>Disable Input</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmInputModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-900/40 transition-all cursor-pointer"
+                  title="Authorize remote touch and keyboard input"
+                >
+                  <Hand className="w-3.5 h-3.5" />
+                  <span>Enable Input</span>
+                </button>
+              )
+            )}
+
             <button
               type="button"
               onClick={() =>
                 handleOpenInfo(
-                  4,
-                  'Stage 4 WebRTC Desktop Streaming Architecture',
-                  'In Stage 4, PocketDesk streams the user desktop over direct peer-to-peer WebRTC across the local Wi-Fi network without third-party cloud relays.',
+                  5,
+                  'Stage 5 Remote Input Architecture & Safety Model',
+                  'In Stage 5, PocketDesk enables touch gesture mapping and on-screen keyboard input to control Windows laptops over local Wi-Fi.',
                   [
-                    'Explicit User Initiation: Screen capture starts strictly on user request.',
-                    'Laptop Indicator: Terminal displays [SCREEN SHARING ACTIVE] whenever streaming.',
-                    'Direct WebRTC PeerConnection: Empty iceServers prevents third-party STUN/TURN data leakage.',
-                    'Configurable Limits: Select 1080p, 720p, 540p or 480p at 15, 20 or 30 FPS to minimize CPU load.',
-                    'Dual Stop Mechanism: Stop button in browser UI + POST /api/stream/stop or Ctrl+C on laptop.',
-                    'Isolated Remote Input: Mouse and keyboard injection remain strictly disabled until Stage 5.'
+                    'Explicit Authorization: Remote input is disabled by default and requires explicit user consent.',
+                    'Emergency Kill Switch: One-click button releases all held keys and mouse buttons immediately.',
+                    'Touch-to-Screen Mapping: Accounts for letterboxing/pillarboxing and normalizes coordinates [0.0, 1.0].',
+                    'Win32 SendInput: Dispatches native cursor moves, mouse clicks, wheel scrolls, and Unicode text entry.',
+                    'UIPI Limitation: Non-elevated processes cannot send synthetic input to Windows Secure Desktop (Ctrl+Alt+Del, UAC prompts).'
                   ]
                 )
               }
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
             >
-              <span>Stage 4 Specs</span>
+              <span>Stage 5 Specs</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -497,13 +614,34 @@ export const App: React.FC = () => {
               streamResolution={streamResolution}
               webrtcState={webrtcState}
               videoRef={videoRef}
+              isInputEnabled={isInputEnabled}
+              isKeyboardOpen={isKeyboardOpen}
               onFpsChange={setStreamFps}
               onResolutionChange={setStreamResolution}
               onStartStream={handleStartStream}
               onStopStream={handleStopStream}
+              onToggleInput={handleToggleInput}
+              onToggleKeyboard={() => setIsKeyboardOpen((prev) => !prev)}
+              onMouseMove={handleMouseMove}
+              onMouseClick={handleMouseClick}
+              onMouseScroll={handleMouseScroll}
+              onSendKey={handleSendKey}
+              onSendText={handleSendText}
+              onSendShortcut={handleSendShortcut}
               onOpenInfo={handleOpenInfo}
             />
-            <MouseKeyboardSection onOpenInfo={handleOpenInfo} />
+            <MouseKeyboardSection
+              isInputEnabled={isInputEnabled}
+              isConnected={connectionStatus === 'connected'}
+              onToggleInput={handleToggleInput}
+              onOpenInfo={handleOpenInfo}
+              onMouseMoveRelative={handleMouseMoveRelative}
+              onMouseClick={handleMouseClick}
+              onMouseScroll={handleMouseScroll}
+              onSendKey={handleSendKey}
+              onSendText={handleSendText}
+              onSendShortcut={handleSendShortcut}
+            />
             <ApplicationsSection onOpenInfo={handleOpenInfo} />
           </div>
 
@@ -532,21 +670,42 @@ export const App: React.FC = () => {
                 streamResolution={streamResolution}
                 webrtcState={webrtcState}
                 videoRef={videoRef}
+                isInputEnabled={isInputEnabled}
+                isKeyboardOpen={isKeyboardOpen}
                 onFpsChange={setStreamFps}
                 onResolutionChange={setStreamResolution}
                 onStartStream={handleStartStream}
                 onStopStream={handleStopStream}
+                onToggleInput={handleToggleInput}
+                onToggleKeyboard={() => setIsKeyboardOpen((prev) => !prev)}
+                onMouseMove={handleMouseMove}
+                onMouseClick={handleMouseClick}
+                onMouseScroll={handleMouseScroll}
+                onSendKey={handleSendKey}
+                onSendText={handleSendText}
+                onSendShortcut={handleSendShortcut}
                 onOpenInfo={handleOpenInfo}
               />
               <div className="p-3 bg-slate-900/70 border border-slate-800 rounded-xl text-xs text-slate-400 flex items-center gap-2">
                 <Info className="w-4 h-4 text-blue-400 shrink-0" />
-                <span>Switch tabs to inspect Controls, Files, Apps, or System Health telemetry.</span>
+                <span>Switch to Controls tab for virtual trackpad or open virtual keyboard.</span>
               </div>
             </div>
           )}
 
           {activeTab === 'controls' && (
-            <MouseKeyboardSection onOpenInfo={handleOpenInfo} />
+            <MouseKeyboardSection
+              isInputEnabled={isInputEnabled}
+              isConnected={connectionStatus === 'connected'}
+              onToggleInput={handleToggleInput}
+              onOpenInfo={handleOpenInfo}
+              onMouseMoveRelative={handleMouseMoveRelative}
+              onMouseClick={handleMouseClick}
+              onMouseScroll={handleMouseScroll}
+              onSendKey={handleSendKey}
+              onSendText={handleSendText}
+              onSendShortcut={handleSendShortcut}
+            />
           )}
 
           {activeTab === 'files' && (
@@ -577,10 +736,60 @@ export const App: React.FC = () => {
             <span>Mobile-to-Windows Remote Control System</span>
           </div>
           <div className="text-[11px] text-slate-400">
-            Stage 4 Local WebRTC Screen Streaming • Ordinary HTTP traffic restricted to trusted LAN
+            Stage 5 Remote Mouse & Keyboard Injection • Private Local Wi-Fi Network
           </div>
         </div>
       </footer>
+
+      {/* Explicit Remote Input Authorization Confirmation Modal */}
+      {confirmInputModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-amber-950/50 border border-amber-800/60 text-amber-400">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">
+                  Enable Remote Input Control?
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Explicit security authorization required
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800/80 text-xs text-slate-300 space-y-2">
+              <p>
+                Enabling remote input allows this browser session to dispatch <strong>mouse movement</strong>, <strong>mouse clicks</strong>, and <strong>keyboard keystrokes</strong> directly to your Windows laptop.
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-slate-400 text-[11px]">
+                <li>You can terminate input at any time via the <strong>Emergency Disable</strong> button.</li>
+                <li>Windows Secure Desktop (Ctrl+Alt+Del, UAC prompts) remains protected by Windows UIPI.</li>
+                <li>Disconnecting or closing the tab immediately revokes input permission.</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmInputModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmEnableInput}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Authorize & Enable</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Connect & Pair Modal Dialog */}
       <ConnectModal

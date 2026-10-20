@@ -29,7 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
                 PocketDesk
               </h1>
               <span className="text-[10px] uppercase font-semibold tracking-wider px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                v0.4.0 • Stage 4
+                v0.5.0 • Stage 5
               </span>
             </div>
             <p className="text-xs text-slate-400 hidden sm:block">
@@ -103,15 +103,15 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             onClick={() =>
               onOpenStageInfo(
-                4,
+                5,
                 'PocketDesk Architecture & Stage Roadmap',
-                'PocketDesk is built incrementally following strict engineering rules. Stage 4 delivers authenticated local WebRTC desktop video streaming with configurable resolution/FPS and laptop terminal indicators.',
+                'PocketDesk is built incrementally following strict engineering rules. Stage 5 delivers authenticated remote mouse and keyboard control with touch gestures, on-screen keyboard, and emergency safety kill switch.',
                 [
                   'Stage 1: Frontend Prototype, UI Dashboard & Responsive Layout (Completed)',
                   'Stage 2: Python FastAPI Agent Foundation & Local Telemetry (Completed)',
                   'Stage 3: Local Network Device Pairing & Authenticated Handshake (Completed)',
-                  'Stage 4: Authenticated WebRTC Desktop Video Streaming (Current Stage)',
-                  'Stage 5: Low-latency Input Dispatch (Mouse, Keyboard, Touch)',
+                  'Stage 4: Authenticated WebRTC Desktop Video Streaming (Completed)',
+                  'Stage 5: Low-latency Input Dispatch (Mouse, Keyboard, Touch) (Current Stage)',
                   'Stage 6: Encrypted WebRTC / NAT Traversal for Remote Internet Access',
                 ]
               )

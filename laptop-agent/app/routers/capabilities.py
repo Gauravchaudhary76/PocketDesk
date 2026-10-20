@@ -47,15 +47,15 @@ REGISTERED_CAPABILITIES = [
     ),
     CapabilityItem(
         name="mouse_control",
-        status="planned",
-        stage=4,
-        description="Synthetic mouse movement deltas, clicks, and multi-touch gesture mapping."
+        status="available",
+        stage=5,
+        description="Synthetic mouse movement, clicks, drag-and-drop, and scroll wheel dispatches."
     ),
     CapabilityItem(
         name="keyboard_control",
-        status="planned",
-        stage=4,
-        description="Virtual keyboard stroke injection and Windows hotkey dispatches."
+        status="available",
+        stage=5,
+        description="Virtual keyboard stroke injection, Unicode text entry, and Windows hotkey dispatches."
     ),
     CapabilityItem(
         name="process_management",

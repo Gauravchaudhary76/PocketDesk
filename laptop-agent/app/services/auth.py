@@ -129,6 +129,13 @@ class AuthService:
         return True
 
     @classmethod
+    def get_session_info(cls, token: Optional[str]) -> Optional[dict]:
+        """Return session metadata if token is valid."""
+        if not cls.validate_session(token):
+            return None
+        return cls._sessions.get(token)
+
+    @classmethod
     def revoke_session(cls, token: Optional[str]) -> bool:
         """Revoke a session upon client disconnect."""
         if token and token in cls._sessions:

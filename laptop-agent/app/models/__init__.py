@@ -9,6 +9,19 @@ from app.models.stream import (
     StreamStopResponse,
     StreamStatusResponse,
 )
+from app.models.input import (
+    MouseMoveRequest,
+    MouseRelativeMoveRequest,
+    MouseClickRequest,
+    MouseScrollRequest,
+    KeyRequest,
+    TextTypeRequest,
+    ShortcutRequest,
+    InputControlRequest,
+    InputStatusResponse,
+    ScreenInfoResponse,
+    InputOperationResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -26,4 +39,15 @@ __all__ = [
     "StreamAnswerResponse",
     "StreamStopResponse",
     "StreamStatusResponse",
+    "MouseMoveRequest",
+    "MouseRelativeMoveRequest",
+    "MouseClickRequest",
+    "MouseScrollRequest",
+    "KeyRequest",
+    "TextTypeRequest",
+    "ShortcutRequest",
+    "InputControlRequest",
+    "InputStatusResponse",
+    "ScreenInfoResponse",
+    "InputOperationResponse",
 ]

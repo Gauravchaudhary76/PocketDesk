@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.dependencies.auth import get_current_token, require_auth
 from app.models.auth import PairRequest, PairResponse, UnpairResponse
 from app.services.auth import AuthService
+from app.services.input import InputService
 
 router = APIRouter(prefix="/api", tags=["Authentication"])
 
@@ -43,6 +44,7 @@ async def pair_client(request: PairRequest) -> PairResponse:
 )
 async def unpair_client(token: str = Depends(require_auth)) -> UnpairResponse:
     """Explicitly terminate the client session."""
+    InputService.disable_input()
     AuthService.revoke_session(token)
     return UnpairResponse(
         status="unpaired",
