@@ -1,13 +1,37 @@
 from collections import namedtuple
 from unittest.mock import patch
 from datetime import datetime
+from app.services.auth import AuthService
+
+
+def get_auth_headers(client):
+    """Helper to pair and return valid authorization headers."""
+    AuthService.clear_all_sessions()
+    code = AuthService.get_active_code()
+    res = client.post("/api/pair", json={"pairing_code": code})
+    assert res.status_code == 200
+    token = res.json()["session_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_system_unauthorized_without_token(client):
+    """Verify GET /api/system rejects requests without an Authorization token."""
+    response = client.get("/api/system")
+    assert response.status_code == 401
+
+
+def test_system_unauthorized_with_invalid_token(client):
+    """Verify GET /api/system rejects requests with a bogus token."""
+    response = client.get("/api/system", headers={"Authorization": "Bearer bogus_token_123"})
+    assert response.status_code == 401
 
 
 def test_system_info_live(client):
-    """Verify GET /api/system returns valid host hardware telemetry."""
-    response = client.get("/api/system")
+    """Verify GET /api/system returns valid host hardware telemetry when authenticated."""
+    headers = get_auth_headers(client)
+    response = client.get("/api/system", headers=headers)
     assert response.status_code == 200
-    
+
     data = response.json()
     assert "os" in data
     assert "cpu" in data
@@ -49,11 +73,12 @@ def test_system_info_live(client):
 
 def test_system_info_mock_with_battery(client):
     """Verify battery parsing when psutil reports a battery present and charging."""
+    headers = get_auth_headers(client)
     MockBattery = namedtuple("MockBattery", ["percent", "secsleft", "power_plugged"])
     mock_bat = MockBattery(percent=85.5, secsleft=3600, power_plugged=True)
 
     with patch("psutil.sensors_battery", return_value=mock_bat):
-        response = client.get("/api/system")
+        response = client.get("/api/system", headers=headers)
         assert response.status_code == 200
         data = response.json()
         bat = data["battery"]
@@ -66,8 +91,9 @@ def test_system_info_mock_with_battery(client):
 
 def test_system_info_mock_without_battery(client):
     """Verify battery reporting when host is a desktop PC or VM without battery hardware."""
+    headers = get_auth_headers(client)
     with patch("psutil.sensors_battery", return_value=None):
-        response = client.get("/api/system")
+        response = client.get("/api/system", headers=headers)
         assert response.status_code == 200
         data = response.json()
         bat = data["battery"]
@@ -80,8 +106,9 @@ def test_system_info_mock_without_battery(client):
 
 def test_system_info_graceful_error_handling(client):
     """Verify system telemetry endpoint does not crash with 500 when hardware queries raise exceptions."""
+    headers = get_auth_headers(client)
     with patch("psutil.virtual_memory", side_effect=PermissionError("Access denied")):
-        response = client.get("/api/system")
+        response = client.get("/api/system", headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert data["memory"]["total_bytes"] == 0

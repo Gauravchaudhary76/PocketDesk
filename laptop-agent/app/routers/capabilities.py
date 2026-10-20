@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.config import settings
+from app.dependencies.auth import require_auth
 from app.models.capabilities import CapabilitiesResponse, CapabilityItem
 
 router = APIRouter(prefix="/api", tags=["Capabilities"])
@@ -27,10 +28,16 @@ REGISTERED_CAPABILITIES = [
         description="Dynamic discovery of supported agent features and roadmap states."
     ),
     CapabilityItem(
+        name="local_network_pairing",
+        status="available",
+        stage=3,
+        description="6-digit PIN terminal pairing with bearer token authorization over local Wi-Fi."
+    ),
+    CapabilityItem(
         name="screen_capture",
         status="planned",
         stage=3,
-        description="DirectX Desktop Duplication API (DXGI) low-latency desktop capture."
+        description="DirectX Desktop Duplication API (DXGI) low-latency desktop capture (planned for future)."
     ),
     CapabilityItem(
         name="screen_streaming",
@@ -74,9 +81,10 @@ REGISTERED_CAPABILITIES = [
 @router.get(
     "/capabilities",
     response_model=CapabilitiesResponse,
-    summary="Agent Capabilities & Roadmap Discovery"
+    summary="Agent Capabilities & Roadmap Discovery",
+    description="Returns capability registry. Requires valid session token."
 )
-async def get_capabilities() -> CapabilitiesResponse:
+async def get_capabilities(token: str = Depends(require_auth)) -> CapabilitiesResponse:
     """Return a list of currently implemented capabilities and roadmap items."""
     return CapabilitiesResponse(
         agent_version=settings.APP_VERSION,

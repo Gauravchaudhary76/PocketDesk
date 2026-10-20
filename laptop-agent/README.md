@@ -1,28 +1,31 @@
 # PocketDesk Laptop Agent (Windows 10/11)
 
-> **Status:** Stage 2 foundation implemented. Binds to `127.0.0.1` (localhost only).
+> **Status:** Stage 3 implemented. Supports local Wi-Fi device pairing and authenticated telemetry.
 
-The PocketDesk Laptop Agent is a lightweight Python service built on **FastAPI** that runs locally on your Windows 10 or 11 laptop. It provides system health reporting, hardware telemetry, and capabilities discovery.
+The PocketDesk Laptop Agent is a lightweight Python service built on **FastAPI** that runs locally on your Windows 10 or 11 laptop. It provides terminal-authorized device pairing, system health reporting, and live hardware telemetry over your local Wi-Fi network.
 
 ---
 
 ## Architecture & Endpoints
 
-| Method | Path | Summary | Response Model |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/health` | Agent health check, version, and uptime | `HealthResponse` |
-| `GET` | `/api/system` | Host OS, CPU load, RAM allocation, and battery | `SystemInfoResponse` |
-| `GET` | `/api/capabilities` | List of implemented vs planned features | `CapabilitiesResponse` |
-| `GET` | `/` | Root agent index and interactive doc links | `dict` |
-| `GET` | `/docs` | Interactive Swagger API documentation | OpenAPI UI |
+| Method | Path | Summary | Authentication | Response Model |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/health` | Agent health check, version, and uptime | Unauthenticated | `HealthResponse` |
+| `POST` | `/api/pair` | Authorize client with 6-digit terminal PIN | Unauthenticated (PIN required) | `PairResponse` |
+| `POST` | `/api/unpair` | Revoke active session token | Bearer Token Required | `UnpairResponse` |
+| `GET` | `/api/system` | Host OS, CPU load, RAM allocation, and battery | Bearer Token Required | `SystemInfoResponse` |
+| `GET` | `/api/capabilities` | List of implemented vs planned features | Bearer Token Required | `CapabilitiesResponse` |
+| `GET` | `/` | Root agent index and interactive doc links | Unauthenticated | `dict` |
+| `GET` | `/docs` | Interactive Swagger API documentation | Unauthenticated | OpenAPI UI |
 
 ---
 
 ## Prerequisites
 
-- **Operating System:** Windows 10 or Windows 11 (64-bit recommended)
-- **Python:** Python 3.10+ (Checked and verified on `Python 3.13.3`)
+- **Operating System:** Windows 10 or Windows 11 (64-bit)
+- **Python:** Python 3.10+ (Verified on `Python 3.13.3`)
 - **PowerShell:** PowerShell 5.1+ or PowerShell 7+
+- **Network:** Laptop and phone connected to the same trusted Wi-Fi router / subnet.
 
 ---
 
@@ -39,7 +42,7 @@ python -m venv .venv
 ```
 
 ### 3. Activate the Virtual Environment
-Depending on your shell of choice:
+Depending on your shell:
 
 **PowerShell:**
 ```powershell
@@ -60,157 +63,133 @@ Once activated, your terminal prompt will show `(.venv)`.
 
 ## Installing Dependencies
 
-With your virtual environment activated, install all pinned dependencies:
+With your virtual environment activated, install all dependencies:
 
 ```powershell
 pip install -r requirements.txt
 ```
 
-Core dependencies installed:
-- `fastapi` — High-performance API framework
-- `uvicorn[standard]` — ASGI server
-- `pydantic` — Type validation and response models
-- `psutil` — Windows hardware and process telemetry
-- `pytest` & `httpx` — Automated test suite and test client
+---
+
+## Windows Firewall Configuration (Safe Procedure)
+
+To allow your phone to connect to the agent on port 8000 over your local Wi-Fi, you must allow inbound traffic on port 8000 for **Private** networks.
+
+> [!CAUTION]
+> **Never disable Windows Firewall.** Do not run commands like `Set-NetFirewallProfile -Enabled False`. Only create specific, port-scoped rules.
+
+### 1. Add Inbound Rule (Run PowerShell as Administrator)
+```powershell
+New-NetFirewallRule -DisplayName "PocketDesk Agent (Port 8000)" -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow -Profile Private
+```
+
+### 2. Verify the Rule
+```powershell
+Get-NetFirewallRule -DisplayName "PocketDesk Agent (Port 8000)"
+```
+
+### 3. Remove the Rule When Testing is Finished
+```powershell
+Remove-NetFirewallRule -DisplayName "PocketDesk Agent (Port 8000)"
+```
 
 ---
 
 ## Starting the Agent
 
-### Standard Startup (Localhost Default: 127.0.0.1:8000)
+### Local Wi-Fi Access Mode (Recommended for Phone Testing):
+```powershell
+python run.py --lan
+```
+
+When started, the terminal output will show:
+```
+==================================================
+  PocketDesk Laptop Agent v0.3.0 (Stage 3)
+  Mode: Local Wi-Fi Network Access enabled
+  Listening on all interfaces: http://0.0.0.0:8000
+  Phone Connection URL: http://192.168.1.145:8000
+--------------------------------------------------
+  >> PAIRING PIN: 839201 <<
+  Enter this 6-digit PIN on your phone to connect.
+==================================================
+```
+
+### Localhost-Only Mode (Testing on Laptop Browser):
 ```powershell
 python run.py
 ```
 
-### Development Mode with Auto-Reload:
-```powershell
-python run.py --reload
-```
+---
 
-### Custom Port:
-```powershell
-python run.py --port 8080
-```
+## Pairing & Authentication Architecture
 
-When started, you will see:
-```
-2026-10-20 12:15:00 [INFO] [pocketdesk.agent] ==================================================
-2026-10-20 12:15:00 [INFO] [pocketdesk.agent]  Starting PocketDesk Laptop Agent v0.2.0 (Stage 2)
-2026-10-20 12:15:00 [INFO] [pocketdesk.agent]  Listening on http://127.0.0.1:8000 (Localhost only)
-2026-10-20 12:15:00 [INFO] [pocketdesk.agent]  Security policy: Local-only, unauthenticated. WAN access strictly prohibited.
-2026-10-20 12:15:00 [INFO] [pocketdesk.agent] ==================================================
-INFO:     Started server process [PID]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-```
+In Stage 3, PocketDesk enforces a physical pairing authorization workflow:
+
+1. **Terminal PIN Authorization:**
+   - Every time the agent starts, a cryptographically random 6-digit numeric PIN (`secrets.randbelow(1000000)`) is generated and logged only on the laptop terminal.
+   - A client must send `POST /api/pair` with this PIN to obtain a session token.
+
+2. **Bearer Token Authentication:**
+   - Successful pairing returns a 256-bit cryptographically secure session token (`secrets.token_hex(32)`).
+   - Subsequent calls to `/api/system` and `/api/capabilities` require `Authorization: Bearer <session_token>`.
+
+3. **Protection Mechanisms:**
+   - Sensitive tokens are stored in memory and `sessionStorage` on the client. They are **never** passed in URL query parameters, never printed in browser console logs, and never committed to source control.
+   - Brute-force protection: After 5 incorrect pairing attempts, the agent locks out pairing for 30 seconds.
+
+4. **Narrow CORS Policy:**
+   - CORS is restricted to localhost (`127.0.0.1`) and private RFC1918 subnets (`192.168.*.*`, `10.*.*.*`, `172.16-31.*.*`).
+   - Unrestricted origins (`*`) are disallowed.
 
 ---
 
-## Testing the Endpoints
+## Security & Network Assumptions (Requirement 8)
 
-### 1. Using PowerShell `Invoke-RestMethod` / `curl`
+> [!WARNING]
+> **Plaintext HTTP Notice:**
+> In this Stage 3 local prototype, communication occurs over unencrypted HTTP.
+> Ordinary HTTP traffic is **not suitable for transmitting credentials or enabling remote control across untrusted networks** (such as public coffee shop Wi-Fi or the open internet), as packets can be intercepted or manipulated.
+> 
+> PocketDesk must only be used on a trusted home Wi-Fi network during this stage.
+> Before any remote internet access is introduced (Stage 6), PocketDesk will mandate encrypted transport (TLS/HTTPS certificates and WebRTC DTLS-SRTP end-to-end encryption).
 
-**Health Check:**
-```powershell
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" | ConvertTo-Json
-```
-Example Output:
-```json
-{
-  "status": "ok",
-  "version": "0.2.0",
-  "agent_name": "PocketDesk Laptop Agent",
-  "stage": 2,
-  "uptime_seconds": 14.25,
-  "timestamp": "2026-10-20T06:45:00.123456+00:00"
-}
-```
+---
 
-**System Telemetry:**
-```powershell
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/system" | ConvertTo-Json -Depth 4
-```
-Example Output:
-```json
-{
-  "os": {
-    "system": "Windows",
-    "release": "11",
-    "version": "10.0.26100",
-    "architecture": "AMD64",
-    "hostname": "MY-LAPTOP"
-  },
-  "cpu": {
-    "model": "Intel64 Family 6 Model 186",
-    "cores_physical": 14,
-    "cores_logical": 20,
-    "usage_percent": 12.4,
-    "frequency_mhz": 2400.0
-  },
-  "memory": {
-    "total_bytes": 34091380736,
-    "available_bytes": 18234859520,
-    "used_bytes": 15856521216,
-    "usage_percent": 46.5
-  },
-  "battery": {
-    "present": true,
-    "percent": 92.0,
-    "is_charging": false,
-    "power_plugged": false,
-    "seconds_left": 14200
-  },
-  "timestamp": "2026-10-20T06:45:05.123456+00:00"
-}
-```
+## Testing the Agent
 
-**Capabilities Discovery:**
-```powershell
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/capabilities" | ConvertTo-Json -Depth 4
-```
-
-### 2. Using Web Browser & Interactive Documentation
-Open your browser and navigate to:
-- **Interactive Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- **ReDoc Documentation:** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
-
-### 3. Running Automated Tests
+### 1. Run Automated Test Suite
 ```powershell
 .\.venv\Scripts\pytest.exe -v
+```
+All 15 automated unit and integration tests will verify pairing, brute-force protection, token revocation, system telemetry, and mock scenarios.
+
+### 2. Manual CLI Testing with PowerShell
+```powershell
+# Check health
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" | ConvertTo-Json
+
+# Attempting /api/system without token will fail with 401:
+try { Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/system" } catch { $_.Exception.Response.StatusCode }
+
+# Pair using the PIN shown on your terminal:
+$pair = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/pair" -Method POST -Body '{"pairing_code":"<YOUR_PIN>"}' -ContentType "application/json"
+$token = $pair.session_token
+
+# Access telemetry with Bearer token:
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/system" -Headers @{ Authorization = "Bearer $token" } | ConvertTo-Json -Depth 4
 ```
 
 ---
 
 ## Stopping the Agent
 
-To gracefully stop the agent:
-1. In the terminal running the agent, press `Ctrl + C`.
-2. Uvicorn will trigger the shutdown lifecycle and exit cleanly.
+Press `Ctrl + C` in the PowerShell window running the agent. Uvicorn will cleanly terminate active sessions and exit.
 
 ---
 
-## Security Assumptions & Threat Model (Requirement 6)
+## Known Limitations (Stage 3 Scope)
 
-In strict accordance with the Stage 2 requirements:
-1. **Local-Only Boundary (127.0.0.1):**
-   - The agent strictly binds to `127.0.0.1` by default.
-   - It is never exposed to the local network (LAN) or public internet.
-   - Any process running locally under the same Windows user session can access this agent.
-
-2. **No Decorative Authentication:**
-   - No fake tokens or cosmetic passwords are added.
-   - Real cryptographic pairing (ephemeral 6-digit PIN or QR token validation with HMAC-SHA256) will only be introduced when LAN / remote bridging is designed in future stages.
-
-3. **No Dangerous Execution:**
-   - No arbitrary shell execution (`os.system`, `subprocess.Popen` from user input) is permitted.
-   - No arbitrary file system access is allowed.
-   - Screen capture and input injection are completely isolated and not implemented in this stage.
-
----
-
-## Known Limitations (Stage 2 Scope)
-
-- **No Remote Streaming:** Screen capture via DirectX Desktop Duplication API (DXGI) is scheduled for **Stage 3**.
-- **No Remote Input:** Mouse movement, clicks, and keyboard strokes cannot be injected in Stage 2. This is scheduled for **Stage 4**.
-- **Localhost Only:** The agent cannot be queried from an external device or phone yet because secure network pairing is not implemented.
+- **No Remote Desktop Video:** Desktop video capture via DXGI/WebRTC is not implemented in Stage 3.
+- **No Mouse/Keyboard Control:** Synthetic mouse and keyboard injection are disabled in this stage.
+- **No Internet Access:** Connections must be within the same private local Wi-Fi subnet.

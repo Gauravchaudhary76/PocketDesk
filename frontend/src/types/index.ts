@@ -1,12 +1,51 @@
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
+export interface OSInfo {
+  system: string;
+  release: string;
+  version: string;
+  architecture: string;
+  hostname: string;
+}
+
+export interface CPUInfo {
+  model: string | null;
+  cores_physical: number | null;
+  cores_logical: number;
+  usage_percent: number;
+  frequency_mhz: number | null;
+}
+
+export interface MemoryInfo {
+  total_bytes: number;
+  available_bytes: number;
+  used_bytes: number;
+  usage_percent: number;
+}
+
+export interface BatteryInfo {
+  present: boolean;
+  percent: number | null;
+  is_charging: boolean | null;
+  power_plugged: boolean | null;
+  seconds_left: number | null;
+}
+
+export interface SystemInfoResponse {
+  os: OSInfo;
+  cpu: CPUInfo;
+  memory: MemoryInfo;
+  battery: BatteryInfo | null;
+  timestamp: string;
+}
+
 export interface DeviceInfo {
   id: string;
   name: string;
   os: string;
   hostname: string;
   ipAddress: string;
-  batteryLevel: number;
+  batteryLevel: number | null;
   isCharging: boolean;
   cpuModel: string;
   ramTotalGb: number;

@@ -2,31 +2,33 @@
 
 PocketDesk is a modern, privacy-focused remote access system designed to let you securely view and control your Windows 10/11 laptop directly from your phone through a mobile-friendly web application.
 
-Development proceeds incrementally in stages, starting with a clean local prototype and gradually introducing backend pairing, high-performance screen capture, low-latency input controls, and encrypted NAT traversal.
+Development proceeds incrementally in stages, starting with a clean local prototype and gradually introducing authenticated local network pairing, high-performance screen capture, low-latency input controls, and encrypted NAT traversal.
 
 ---
 
 ## Technology Stack
 
-### Frontend (Stage 1)
+### Frontend (Stage 1 & 3)
 - **Framework:** React 19 + TypeScript
 - **Build Tool:** Vite 8
 - **Styling:** Tailwind CSS v4
 - **Iconography:** Lucide React
 - **Design Philosophy:** Mobile-first, responsive dark theme, accessible semantic controls
+- **Connection Workflow:** Configurable agent address, PIN pairing dialog, automatic telemetry polling
 
-### Laptop Agent (Stage 2 — Current)
+### Laptop Agent (Stage 2 & 3 — Current)
 - **Framework:** Python 3.10+ with FastAPI and Uvicorn
 - **Validation:** Pydantic v2 data models
+- **Authentication:** Ephemeral 6-digit terminal PIN authorization with Bearer session tokens
 - **Hardware Telemetry:** `psutil` (OS, CPU load, RAM allocation, battery sensors)
-- **Testing:** `pytest` and `httpx` (100% passing test coverage)
-- **Security Policy:** Local-only (`127.0.0.1:8000`). No public exposure, no decorative auth.
+- **Testing:** `pytest` and `httpx` (15 passing automated tests)
+- **Network Scope:** Local private Wi-Fi network (RFC1918 subnets: `192.168.x.x`, `10.x.x.x`, `172.16-31.x.x`)
 
-### Future Stages (Stages 3 to 6)
-- **Screen Capture:** DirectX Desktop Duplication API (DXGI) via C++/Python *(Stage 3)*
+### Future Stages (Stages 4 to 6)
 - **Input Injection:** Win32 `SendInput` / `pynput` *(Stage 4)*
+- **Screen Streaming:** DirectX Desktop Duplication API (DXGI) and WebRTC *(Stage 4)*
 - **File Transfer:** Chunked binary streaming with SHA-256 verification *(Stage 5)*
-- **Real-time Media:** WebRTC (PeerConnection, DataChannels) and encrypted NAT traversal *(Stages 3 & 6)*
+- **Encrypted Remote Access:** WebRTC NAT traversal, TLS certificates, and end-to-end encryption *(Stage 6)*
 - **Cost & Dependencies:** 100% free and open-source. Zero paid external APIs, zero third-party AI keys.
 
 ---
@@ -35,46 +37,38 @@ Development proceeds incrementally in stages, starting with a clean local protot
 
 ```
 pocketdesk/
-├── frontend/                 # React + Vite + TypeScript web dashboard (Stage 1)
+├── frontend/                 # React + Vite + TypeScript web dashboard (Stage 1 & 3)
 │   ├── src/
 │   │   ├── components/       # Reusable UI components
 │   │   │   ├── Header.tsx               # Branding, status, state preview switcher
-│   │   │   ├── DeviceCard.tsx           # Paired laptop info & Connect button
+│   │   │   ├── DeviceCard.tsx           # Paired laptop info, address config & Connect button
+│   │   │   ├── ConnectModal.tsx         # Address configuration & 6-digit PIN pairing dialog
 │   │   │   ├── RemoteDisplay.tsx        # 16:9 remote desktop preview container
-│   │   │   ├── MouseKeyboardSection.tsx # Virtual trackpad & hotkeys
-│   │   │   ├── FileTransferSection.tsx  # File drag & drop & transfer queue
-│   │   │   ├── ApplicationsSection.tsx  # Quick launcher & task manager
-│   │   │   ├── SystemMonitorSection.tsx # Hardware telemetry & resource meters
+│   │   │   ├── MouseKeyboardSection.tsx # Virtual trackpad & hotkeys (disabled in Stage 3)
+│   │   │   ├── FileTransferSection.tsx  # File drag & drop queue (disabled in Stage 3)
+│   │   │   ├── ApplicationsSection.tsx  # Quick launcher & task manager (disabled in Stage 3)
+│   │   │   ├── SystemMonitorSection.tsx # Live hardware telemetry & resource meters
 │   │   │   ├── StatusBadge.tsx          # Connection state indicator pill
 │   │   │   ├── StageBadge.tsx           # Roadmap milestone indicator
 │   │   │   └── InfoModal.tsx            # Stage notification dialog (Rule #6)
 │   │   ├── types/            # TypeScript interfaces & domain models
-│   │   ├── App.tsx           # Root layout & live agent connectivity
+│   │   ├── App.tsx           # Root layout & Wi-Fi pairing/telemetry state manager
 │   │   ├── index.css         # Base styles and dark scrollbars
 │   │   └── main.tsx          # Entrypoint
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── vite.config.ts
-├── laptop-agent/             # Python FastAPI Windows Desktop Agent (Stage 2)
+├── laptop-agent/             # Python FastAPI Windows Desktop Agent (Stage 2 & 3)
 │   ├── app/
-│   │   ├── models/           # Pydantic request & response schemas
-│   │   │   ├── health.py     # GET /health schema
-│   │   │   ├── system.py     # GET /api/system telemetry schema
-│   │   │   └── capabilities.py # GET /api/capabilities schema
-│   │   ├── routers/          # FastAPI route controllers
-│   │   │   ├── health.py     # /health endpoint
-│   │   │   ├── system.py     # /api/system endpoint
-│   │   │   └── capabilities.py # /api/capabilities endpoint
-│   │   ├── services/         # Telemetry data providers (psutil & platform)
-│   │   ├── config.py         # Application settings (127.0.0.1 default)
+│   │   ├── models/           # Pydantic schemas (auth, health, system, capabilities)
+│   │   ├── routers/          # FastAPI routes (/health, /api/pair, /api/system, etc.)
+│   │   ├── services/         # Telemetry data providers & PIN authentication manager
+│   │   ├── dependencies/     # Bearer token validation dependencies
+│   │   ├── config.py         # App settings & LAN IP discovery
 │   │   ├── logger.py         # Structured logging configuration
-│   │   └── main.py           # FastAPI application entry & CORS middleware
-│   ├── tests/                # Automated pytest suite
-│   │   ├── conftest.py       # TestClient fixtures
-│   │   ├── test_health.py    # Health & root route tests
-│   │   ├── test_system.py    # Real & mocked telemetry tests
-│   │   └── test_capabilities.py # Capabilities registry tests
-│   ├── run.py                # Agent CLI launcher
+│   │   └── main.py           # FastAPI entry & narrow CORS regex configuration
+│   ├── tests/                # Automated pytest suite (15 unit/integration tests)
+│   ├── run.py                # Agent CLI launcher with --lan support
 │   ├── requirements.txt      # Python dependencies
 │   └── README.md             # Virtual environment setup & usage guide
 ├── docs/                     # Engineering architecture & roadmap
@@ -98,74 +92,96 @@ Before setting up PocketDesk, ensure your development machine has the following 
 
 ---
 
-## Setup & Startup Instructions
+## Step-by-Step Local Wi-Fi Testing Procedure
 
-### 1. Windows Laptop Agent (Python + FastAPI)
+Follow this guide to connect your smartphone to your Windows laptop over your local home Wi-Fi:
+
+### Step 1: Ensure Devices Are on the Same Wi-Fi
+Connect your mobile phone and your Windows laptop to the same Wi-Fi router / SSID.
+
+### Step 2: Configure Windows Firewall Safely
+To permit incoming agent connections on port 8000 without disabling your firewall, run **PowerShell as Administrator**:
 
 ```powershell
-# Navigate to laptop-agent directory
+New-NetFirewallRule -DisplayName "PocketDesk Agent (Port 8000)" -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow -Profile Private
+```
+
+*(To remove this rule after testing: `Remove-NetFirewallRule -DisplayName "PocketDesk Agent (Port 8000)"`)*
+
+### Step 3: Start the Python Laptop Agent
+In a PowerShell terminal:
+
+```powershell
 cd C:\Users\gaura\.gemini\antigravity\scratch\pocketdesk\laptop-agent
-
-# Create and activate virtual environment
-python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Start the agent (binds strictly to 127.0.0.1:8000)
-python run.py
-
-# Run the automated tests
-pytest -v
+python run.py --lan
 ```
 
-### 2. Frontend Dashboard (React + Vite)
+The terminal will display your laptop's local IP and a unique 6-digit pairing PIN:
+```
+==================================================
+  PocketDesk Laptop Agent v0.3.0 (Stage 3)
+  Mode: Local Wi-Fi Network Access enabled
+  Listening on all interfaces: http://0.0.0.0:8000
+  Phone Connection URL: http://192.168.1.145:8000
+--------------------------------------------------
+  >> PAIRING PIN: 839201 <<
+  Enter this 6-digit PIN on your phone to connect.
+==================================================
+```
 
-In a separate terminal:
+### Step 4: Start the Frontend Web Server
+In a second PowerShell terminal:
 
 ```powershell
-# Navigate to frontend directory
 cd C:\Users\gaura\.gemini\antigravity\scratch\pocketdesk\frontend
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
+npm run dev -- --host
 ```
 
-Open `http://localhost:5173/` in your browser. Click **"Connect to Agent"** to connect the frontend to your local Python agent and stream live Windows telemetry.
+Vite will display your phone's connection URL (e.g., `http://192.168.1.145:5173/`).
+
+### Step 5: Open on Phone and Pair
+1. On your phone's browser, navigate to the Vite network address (e.g. `http://192.168.1.145:5173`).
+2. Tap the **"Pair with Laptop"** button or **"Connect to Laptop"** on the Device Card.
+3. Verify that the agent address matches your laptop's IP and port (e.g. `http://192.168.1.145:8000`).
+4. Enter the **6-digit Pairing PIN** displayed on your laptop terminal.
+5. Tap **"Authorize & Connect"**.
+
+### Step 6: Verify Live Hardware Telemetry
+- The status updates to **"Agent Online"** / **"Paired & Authorized"**.
+- The **System Monitor** displays real-time CPU usage %, memory utilization, and battery telemetry polled every 2.5 seconds.
+- Tap **"Disconnect"** to verify graceful session revocation.
 
 ---
 
-## Current Limitations (Stage 2 Scope)
+## Security Invariants & Transport Notice (Requirement 8)
 
-In strict accordance with the development guidelines:
-- **No live video stream yet:** Screen capture via the DirectX Desktop Duplication API (DXGI) is scheduled for **Stage 3**.
-- **No active remote control:** Mouse and keyboard input injection is intentionally inactive to prevent unverified execution. Input dispatching via the native Windows agent is scheduled for **Stage 4**.
-- **Localhost only:** The agent strictly binds to `127.0.0.1:8000`. It is never exposed to the public internet or external networks during early stages.
-- **No decorative authentication:** Localhost assumptions are documented cleanly without fake tokens.
-- **Rule #6 Enforced:** Buttons and controls do not pretend to work. Controls relying on future stages open an explanatory dialog detailing what will be implemented, which stage will deliver it, and how it will work.
+> [!WARNING]
+> **Plaintext HTTP Limitation:**
+> In Stage 3, communication between your phone and laptop occurs over unencrypted HTTP.
+> **Ordinary HTTP traffic is not suitable for transmitting credentials, tokens, or enabling remote control across untrusted networks** (such as public coffee shops, guest Wi-Fi, or the internet), because packets can be snooped or altered by local network eavesdroppers.
+> 
+> **Stage 3 Scope Rule:** PocketDesk must strictly be operated on trusted private home/work Wi-Fi networks during this stage.
+> 
+> **Internet Access Requirement (Stage 6):** Before any internet connectivity is enabled, PocketDesk will require:
+> - Encrypted transport (TLS/HTTPS certificates)
+> - WebRTC DTLS-SRTP encryption for real-time media
+> - Authenticated key-exchange protocols
 
 ---
 
-## Features Planned for Future Stages
+## Automated Tests
 
-1. **Stage 3 — Screen Capture & Telemetry Stream:**
-   - Low-latency GPU screen capture via DXGI.
-   - WebRTC media streaming to mobile browsers.
-   - Real-time video frame decoder on HTML5 Canvas.
+Run the automated test suite in `laptop-agent/`:
 
-2. **Stage 4 — Input & Process Management:**
-   - Mobile virtual trackpad with gestures (pan, tap, two-finger scroll).
-   - Windows hotkey triggers (`Ctrl+Alt+Del`, `Alt+Tab`, `Win+D`, `Win+E`).
-   - Task manager for inspecting and terminating processes.
+```powershell
+cd C:\Users\gaura\.gemini\antigravity\scratch\pocketdesk\laptop-agent
+.\.venv\Scripts\pytest.exe -v
+```
 
-3. **Stage 5 — File Transfer:**
-   - Drag-and-drop file transfer between phone and laptop.
-   - Chunked binary transfer with SHA-256 verification.
-
-4. **Stage 6 — Secure Remote Internet Access:**
-   - WebRTC NAT traversal / encrypted mesh tunnel.
-   - End-to-end encryption for out-of-home access.
+All 15 unit and integration tests verify:
+- PIN pairing authorization
+- Brute-force rate limiting and lockout protection
+- Bearer session token validation & revocation
+- Hardware telemetry parsing & sensor failure fallbacks
+- Unauthenticated access rejection (401)

@@ -135,7 +135,7 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
           </div>
         )}
 
-        {/* State: CONNECTED (Stage 2 Agent Verified) */}
+        {/* State: CONNECTED (Stage 3 Wi-Fi Paired & Authenticated) */}
         {status === 'connected' && (
           <div className="max-w-md flex flex-col items-center z-10 space-y-3">
             <div className="w-16 h-16 rounded-2xl bg-emerald-950/40 border border-emerald-800/60 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-950/50">
@@ -145,22 +145,22 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
             <div className="space-y-1">
               <div className="flex items-center justify-center gap-2">
                 <h3 className="text-base font-semibold text-emerald-300">
-                  Laptop Agent Online (v0.2.0)
+                  Laptop Agent Online (v0.3.0)
                 </h3>
-                <StageBadge stage={2} label="Stage 2 Connected" variant="filled" />
+                <StageBadge stage={3} label="Stage 3 Paired" variant="filled" />
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Agent is active on <span className="font-mono text-emerald-300">127.0.0.1:8000</span>. Hardware telemetry endpoints are responding. Real-time screen capture via DXGI will be integrated in Stage 3.
+                Device paired over local Wi-Fi with verified 6-digit PIN. Real-time telemetry is streaming below. Remote screen capture and input injection remain safely isolated in this stage.
               </p>
             </div>
 
             <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800/80 text-[11px] text-slate-400 text-left w-full space-y-1">
               <div className="flex items-center gap-1.5 font-medium text-slate-300">
                 <Layers className="w-3.5 h-3.5 text-blue-400" />
-                <span>Next Milestone (Stage 3):</span>
+                <span>Future Milestone (Video Stream):</span>
               </div>
               <p className="text-slate-400">
-                DirectX Desktop Duplication API (DXGI) video pipeline will stream real-time desktop video frames directly into this viewport.
+                DirectX Desktop Duplication API (DXGI) video pipeline will encode desktop frames over WebRTC into this viewport in future stages.
               </p>
             </div>
           </div>

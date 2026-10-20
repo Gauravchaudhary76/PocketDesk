@@ -9,7 +9,8 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.logger import setup_logging
-from app.routers import capabilities_router, health_router, system_router
+from app.routers import auth_router, capabilities_router, health_router, system_router
+from app.services.auth import AuthService
 
 # Setup application logging
 setup_logging()
@@ -19,17 +20,13 @@ logger = logging.getLogger("pocketdesk.agent")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifecycle manager."""
-    # Record server boot time for health uptime calculation
     app.state.start_time = time.time()
     
-    # Run security validation
+    # Run security validation & display network endpoints
     settings.validate_security()
     
-    logger.info("==================================================")
-    logger.info(" Starting %s v%s (Stage %s)", settings.APP_NAME, settings.APP_VERSION, settings.STAGE)
-    logger.info(" Listening on http://%s:%s (Localhost only)", settings.HOST, settings.PORT)
-    logger.info(" Security policy: Local-only, unauthenticated. WAN access strictly prohibited.")
-    logger.info("==================================================")
+    # Ensure a pairing PIN is initialized and displayed
+    AuthService.get_active_code()
     
     yield
     
@@ -40,29 +37,30 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description=(
-        "PocketDesk Windows Laptop Agent (Stage 2 foundation). "
-        "Provides local telemetry, health monitoring, and capabilities discovery."
+        "PocketDesk Windows Laptop Agent (Stage 3). "
+        "Provides authenticated local network system telemetry and device pairing."
     ),
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
 )
 
-# CORS configuration to allow local frontend access
+# Narrow CORS configuration:
+# Strictly permits only loopback (localhost/127.0.0.1) and private RFC1918 subnets (192.168.*, 10.*, 172.16-31.*).
+# Rejects all public internet origins.
+LOCAL_NETWORK_ORIGIN_REGEX = (
+    r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$"
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:4173",
-        "http://127.0.0.1:4173",
-    ],
+    allow_origin_regex=LOCAL_NETWORK_ORIGIN_REGEX,
     allow_credentials=True,
-    allow_methods=["GET", "OPTIONS"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
-# Global unhandled exception handler
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Ensure unexpected server errors return clean, structured JSON."""
@@ -78,7 +76,6 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     )
 
 
-# Root informational endpoint
 @app.get("/", summary="Agent Index")
 async def root():
     """Agent index providing documentation and health links."""
@@ -88,6 +85,7 @@ async def root():
         "stage": settings.STAGE,
         "docs": "/docs",
         "health": "/health",
+        "pair": "/api/pair",
         "system": "/api/system",
         "capabilities": "/api/capabilities",
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -96,5 +94,6 @@ async def root():
 
 # Register feature routers
 app.include_router(health_router)
+app.include_router(auth_router)
 app.include_router(system_router)
 app.include_router(capabilities_router)
