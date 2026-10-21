@@ -2,19 +2,28 @@
 
 PocketDesk is a modern, privacy-focused remote access system designed to let you securely view and control your Windows 10/11 laptop directly from your phone through a mobile-friendly web application.
 
-Development proceeds incrementally in stages, starting with a clean local prototype and gradually introducing authenticated local network pairing, high-performance WebRTC screen capture, low-latency input controls, and encrypted NAT traversal.
+Development proceeds incrementally in stages, starting with a clean local prototype and gradually introducing authenticated local network pairing, high-performance WebRTC screen capture, low-latency input controls, encrypted NAT traversal, and safe restricted file and application management.
 
 ---
 
 ## Technology Stack
 
-### Frontend (Stages 1 through 6 — Current)
+### Frontend (Stages 1 through 7 — Current)
 - **Framework:** React 19 + TypeScript
 - **Build Tool:** Vite 8
 - **Styling:** Tailwind CSS v4
 - **Iconography:** Lucide React
 - **Screen Streaming:** Standard WebRTC `RTCPeerConnection` with DTLS-SRTP encryption, HTML5 `<video>` viewport with native Fullscreen API support, and configurable resolution & FPS controls.
-- **NAT Traversal Client (Stage 6):** Dynamically acquires time-limited STUN/TURN credentials from the laptop agent; supports dual-mode connection ("Local Wi-Fi Mode" vs "Remote Internet Mode").
+- **Restricted File Manager (Stage 7):**
+  - Interactive approved directory browser (Downloads, Documents, Desktop, Pictures) with breadcrumbs.
+  - Direct file download to mobile browser.
+  - Chunked upload dropzone with real-time percentage progress bar and 50 MB limit enforcement.
+  - Folder creation modal with Windows naming validation.
+- **Application Launcher (Stage 7):**
+  - Allowlist-restricted application grid (Notepad, Calculator, Paint, File Explorer, Microsoft Edge, VS Code, Task Manager, Terminal).
+  - Explicit confirmation modal for potentially disruptive tools (Task Manager, PowerShell/Terminal).
+  - Live feedback toast with host Process ID (PID).
+- **Remote NAT Traversal (Stage 6):** Dynamically acquires time-limited STUN/TURN credentials from the laptop agent; supports dual-mode connection ("Local Wi-Fi Mode" vs "Remote Internet Mode").
 - **Device Security & Management (Stage 6):**
   - Persistent unique client device identification (`dev_...`) stored in `localStorage`.
   - Single-use cryptographic nonces and client timestamps ($\pm 60$s) for replay protection.
@@ -23,29 +32,34 @@ Development proceeds incrementally in stages, starting with a clean local protot
   - Direct touch-to-screen cursor control with letterbox/pillarbox aspect-ratio compensation.
   - Dedicated virtual trackpad zone with sensitivity controls, tap-to-click, and drag lock.
   - On-screen virtual keyboard supporting special navigation keys (`Enter`, `Esc`, `Tab`, `Backspace`, arrows).
-  - Native mobile text entry field with Unicode character batching.
   - Safety controls: Default-disabled input with explicit consent confirmation modal and persistent Emergency Stop button.
 
-### Laptop Agent (Stages 2 through 6 — Current)
-- **Framework:** Python 3.10+ with FastAPI and Uvicorn
+### Laptop Agent (Stages 2 through 7 — Current)
+- **Framework:** Python 3.10+ with FastAPI, Uvicorn, and `python-multipart`
 - **Validation:** Pydantic v2 data models with strict input bounds
 - **Authentication:** Ephemeral 6-digit terminal PIN authorization with Bearer session tokens (1-hour TTL)
+- **Restricted File Service (Stage 7):**
+  - Canonical path resolution (`Path.resolve()`) strictly confined to approved roots (`POCKETDESK_ALLOWED_ROOTS`).
+  - Path traversal and symlink escape defenses (rejects `../`, absolute paths, null bytes).
+  - Blacklist filtering of sensitive files, browser profiles, and credentials (`.ssh`, `.env`, `AppData`, `id_rsa`).
+  - 50 MB upload limit with automated partial-file cleanup on limit violation.
+- **Allowlisted Application Launcher (Stage 7):**
+  - Predefined mapping of immutable application IDs to fixed host executable paths.
+  - Zero arbitrary shell execution: processes spawned via `subprocess.Popen(..., shell=False)`.
+  - Confirmation requirement for disruptive tools.
 - **Remote NAT Traversal (Stage 6):** Dynamic RFC 5766 TURN ephemeral credentials (`TurnService`) with HMAC-SHA1 signature and STUN server discovery.
 - **Device Management & Replay Protection (Stage 6):**
   - Persistent `DeviceRegistry` (`data/devices.json`) managing 256-bit cryptographic device secrets.
   - `ReplayProtection` service validating timestamp windows ($\pm 60$s) and caching consumed nonces.
   - `RateLimiter` sliding-window lockout enforcing a 5-minute lockout after 5 consecutive failed attempts.
-  - Zero-tolerance revocation: dropping a device instantly drops its active WebRTC stream and disables input.
 - **Desktop Capture (Stage 4):** Fast Windows desktop frame capture via `mss` with Pillow bilinear downscaling
 - **WebRTC Video Engine (Stage 4 & 6):** `aiortc` and PyAV (`av`) generating paced H.264 / VP8 video streams over DTLS-SRTP
 - **Win32 Input Injection (Stage 5):**
   - Native `ctypes.windll.user32` interface calling `SetCursorPos`, `mouse_event`, and `SendInput`.
   - Unicode character typing via `KEYEVENTF_UNICODE` (independent of host keyboard layout).
   - In-memory tracking of all held keys and mouse buttons with automatic emergency release upon disconnect.
-  - Rate limiting (max 150 events/sec) and stale-packet discarding (> 1.5s).
 - **Hardware Telemetry:** `psutil` (OS, CPU load, RAM allocation, battery sensors)
-- **Testing:** `pytest` and `httpx` (34 passing automated unit & integration tests)
-- **Network Scope:** Dual-mode: Local private Wi-Fi (LAN) or secure remote internet access via reverse proxy and TURN relay.
+- **Testing:** `pytest` and `httpx` (53 passing automated unit & integration tests)
 
 ---
 
@@ -53,7 +67,7 @@ Development proceeds incrementally in stages, starting with a clean local protot
 
 ```
 pocketdesk/
-├── frontend/                 # React + Vite + TypeScript web dashboard (Stages 1 - 6)
+├── frontend/                 # React + Vite + TypeScript web dashboard (Stages 1 - 7)
 │   ├── src/
 │   │   ├── components/       # Reusable UI components
 │   │   │   ├── Header.tsx                 # Branding, status, mode badge & Devices modal trigger
@@ -63,13 +77,15 @@ pocketdesk/
 │   │   │   ├── RemoteDisplay.tsx          # WebRTC video stream viewport, touch controls & Emergency Stop
 │   │   │   ├── VirtualKeyboard.tsx        # On-screen keyboard with special keys & shortcuts
 │   │   │   ├── MouseKeyboardSection.tsx   # Virtual trackpad, tactile click buttons & hotkeys
-│   │   │   ├── FileTransferSection.tsx    # File drag & drop queue (labeled future stage)
-│   │   │   ├── ApplicationsSection.tsx    # Quick launcher & task manager (labeled future stage)
+│   │   │   ├── FileTransferSection.tsx    # Stage 7 restricted file manager & uploader
+│   │   │   ├── ApplicationsSection.tsx    # Stage 7 allowlisted application launcher
 │   │   │   ├── SystemMonitorSection.tsx   # Live hardware telemetry & resource meters
 │   │   │   ├── StatusBadge.tsx            # Connection state indicator pill
 │   │   │   ├── StageBadge.tsx             # Roadmap milestone indicator
-│   │   │   └── InfoModal.tsx              # Stage notification dialog (Rule #6)
+│   │   │   └── InfoModal.tsx              # Stage notification dialog
 │   │   ├── services/
+│   │   │   ├── files.ts                   # Stage 7 file operations & upload tracking
+│   │   │   ├── apps.ts                    # Stage 7 application launcher client
 │   │   │   ├── remote.ts                  # Stage 6 remote client, secrets & replay nonces
 │   │   │   ├── webrtc.ts                  # WebRTC RTCPeerConnection & signaling client
 │   │   │   └── input.ts                   # Input client, WebSocket dispatcher & coordinate mapping
@@ -80,16 +96,16 @@ pocketdesk/
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── vite.config.ts
-├── laptop-agent/             # Python FastAPI Windows Desktop Agent (Stages 2 - 6)
+├── laptop-agent/             # Python FastAPI Windows Desktop Agent (Stages 2 - 7)
 │   ├── app/
-│   │   ├── models/           # Pydantic schemas (auth, health, system, stream, input, remote)
-│   │   ├── routers/          # FastAPI routes (/health, /api/pair, /api/stream/*, /api/input/*, /api/remote/*)
-│   │   ├── services/         # Telemetry, TurnService, DeviceRegistry, ReplayProtection, RateLimiter
+│   │   ├── models/           # Pydantic schemas (auth, health, system, stream, input, remote, files, apps)
+│   │   ├── routers/          # FastAPI routes (/health, /api/pair, /api/stream/*, /api/input/*, /api/remote/*, /api/files/*, /api/apps/*)
+│   │   ├── services/         # Telemetry, TurnService, DeviceRegistry, ReplayProtection, FileManager, AppLauncher
 │   │   ├── dependencies/     # Bearer token validation dependencies
 │   │   ├── config.py         # App settings & environment discovery
 │   │   ├── logger.py         # Structured logging configuration
 │   │   └── main.py           # FastAPI entry & WebRTC/Input lifespan cleanup
-│   ├── tests/                # Automated pytest suite (34 unit/integration tests)
+│   ├── tests/                # Automated pytest suite (53 unit/integration tests)
 │   ├── run.py                # Agent CLI launcher with --lan support
 │   ├── requirements.txt      # Python dependencies
 │   └── README.md             # Virtual environment setup & usage guide
@@ -97,6 +113,7 @@ pocketdesk/
 │   ├── architecture.md       # High-level component interactions & data flow
 │   ├── deployment_guide.md   # Production deployment options (Mesh overlay vs Reverse Proxy + Coturn)
 │   ├── security_checklist.md # Threat model, HTTPS warning, and verification procedures
+│   ├── file_management_and_app_launcher.md # Stage 7 file security & application allowlist specifications
 │   └── roadmap.md            # Multi-stage roadmap specifications
 └── README.md                 # Project overview & documentation
 ```
@@ -113,11 +130,11 @@ pocketdesk/
 
 ---
 
-## Deployment & Remote Access (Stage 6)
+## Documentation
 
-For complete production deployment instructions, please review the dedicated documentation:
-- **Deployment Guide:** [`docs/deployment_guide.md`](docs/deployment_guide.md) (Details on Tailscale mesh VPN, Caddy/Nginx reverse proxies, Coturn TURN relay setup, and infrastructure costs).
-- **Security Checklist:** [`docs/security_checklist.md`](docs/security_checklist.md) (Threat model, "HTTPS is not enough" analysis, and manual verification steps).
+- **File Manager & App Launcher (Stage 7):** [`docs/file_management_and_app_launcher.md`](docs/file_management_and_app_launcher.md)
+- **Deployment Guide:** [`docs/deployment_guide.md`](docs/deployment_guide.md)
+- **Security Checklist:** [`docs/security_checklist.md`](docs/security_checklist.md)
 
 ---
 
@@ -141,12 +158,18 @@ For complete production deployment instructions, please review the dedicated doc
    ```
 4. On your phone, open the frontend, select **"Local Wi-Fi Mode"**, enter the 6-digit PIN, and connect.
 
-### 2. Remote Internet Testing Mode (Stage 6)
-1. In the web client, click **Connect / Pair** and select the **"Remote Internet (Stage 6)"** tab.
-2. Enter the remote agent URL (e.g. `https://pocketdesk.yourdomain.com`).
-3. For new devices: Enter the 6-digit terminal PIN to register the device. A 256-bit secret is issued and saved locally.
-4. For returning devices: Click **"Connect Paired Device"** — the client authenticates instantly using its cryptographic secret and single-use replay nonces.
-5. Tap **"Devices"** in the top navigation bar to inspect authorized devices or revoke access immediately.
+### 2. Testing Stage 7 Features
+1. **File Management:**
+   - Go to the **Files** section in the web interface.
+   - Switch between approved root tabs (Downloads, Documents, Desktop, Pictures).
+   - Click a folder to browse contents; use the breadcrumbs or the `..` button to navigate up.
+   - Click the download icon to save a file to your phone.
+   - Click **Upload** to send a file to the active folder (with live percentage progress).
+   - Click **New Folder** to create a subdirectory.
+2. **Application Launching:**
+   - Go to the **Apps** section in the web interface.
+   - Click the **Play** button on **Calculator** or **Notepad**; verify it opens on your Windows host desktop.
+   - Click the **Play** button on a disruptive application (such as **Task Manager** or **Terminal**); verify that a confirmation modal appears before launching.
 
 ---
 
@@ -164,4 +187,4 @@ cd frontend
 npm run build
 ```
 
-Both test suites pass with **100% success** (34 Python tests + clean Vite build).
+Both test suites pass with **100% success** (53 Python tests + clean Vite build).

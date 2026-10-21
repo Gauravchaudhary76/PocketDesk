@@ -25,14 +25,14 @@ def test_capabilities_endpoint(client):
 
     data = response.json()
     assert "agent_version" in data
-    assert data["current_stage"] == 6
+    assert data["current_stage"] == 7
     assert "capabilities" in data
     assert isinstance(data["capabilities"], list)
     assert len(data["capabilities"]) > 0
 
     cap_dict = {cap["name"]: cap for cap in data["capabilities"]}
 
-    # Verify Stage 2, 3, 4, 5 & 6 available capabilities
+    # Verify Stage 2, 3, 4, 5, 6 & 7 available capabilities
     assert "health_check" in cap_dict
     assert cap_dict["health_check"]["status"] == "available"
 
@@ -60,9 +60,11 @@ def test_capabilities_endpoint(client):
     assert "remote_nat_traversal" in cap_dict
     assert cap_dict["remote_nat_traversal"]["status"] == "available"
 
-    # Verify future stage planned capabilities
-    assert "file_transfer" in cap_dict
-    assert cap_dict["file_transfer"]["status"] == "planned"
+    assert "restricted_file_management" in cap_dict
+    assert cap_dict["restricted_file_management"]["status"] == "available"
+
+    assert "application_launcher" in cap_dict
+    assert cap_dict["application_launcher"]["status"] == "available"
 
 
 def test_invalid_endpoint_returns_404(client):

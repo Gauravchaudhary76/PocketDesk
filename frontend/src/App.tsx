@@ -92,7 +92,7 @@ export const App: React.FC = () => {
   }>({
     isOpen: false,
     title: '',
-    stageNumber: 6,
+    stageNumber: 7,
     description: '',
     details: [],
   });
@@ -560,23 +560,23 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Stage 6 Scope Announcement Banner */}
+        {/* Stage 7 Scope Announcement Banner */}
         <div className="bg-gradient-to-r from-blue-950/60 via-slate-900/80 to-indigo-950/60 border border-blue-900/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
           <div className="flex items-start gap-3">
-            <div className="p-2.5 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400 shrink-0 mt-0.5">
-              <Globe className="w-5 h-5 text-cyan-400" />
+            <div className="p-2.5 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 shrink-0 mt-0.5">
+              <FolderUp className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                  <Globe className="w-4 h-4 text-cyan-400" />
-                  Stage 6: Secure Remote Access & WebRTC NAT Traversal
+                  <FolderUp className="w-4 h-4 text-indigo-400" />
+                  Stage 7: Restricted File Manager & Application Launcher
                 </h2>
-                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                   Active Stage
                 </span>
                 {connectionMode === 'remote' && (
-                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
                     INTERNET NAT/TURN
                   </span>
                 )}
@@ -587,7 +587,7 @@ export const App: React.FC = () => {
                 )}
               </div>
               <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
-                Connect to your Windows laptop across different networks and carrier-grade NATs. Powered by WebRTC with dynamic STUN/TURN relay credentials (RFC 5766), persistent device registration, cryptographic replay protection, and rate limiting.
+                Browse, upload, and download files within approved laptop folders (Downloads, Documents, Desktop) with canonical path traversal defense and 50MB upload limits. Launch approved Windows applications via a strict predefined allowlist.
               </p>
             </div>
           </div>
@@ -644,23 +644,23 @@ export const App: React.FC = () => {
               type="button"
               onClick={() =>
                 handleOpenInfo(
-                  6,
-                  'Stage 6 Remote Access Architecture & Security Specifications',
-                  'In Stage 6, PocketDesk adds production-grade remote internet connectivity with zero unauthenticated endpoints exposed to the public.',
+                  7,
+                  'Stage 7 File Security & Application Launcher Specifications',
+                  'In Stage 7, PocketDesk implements safe, restricted file transfer and application launching with zero arbitrary shell execution.',
                   [
-                    'WebRTC DTLS-SRTP: End-to-end media encryption for desktop video streaming and binary data channels.',
-                    'Dynamic STUN / TURN Traversal: Generates time-limited RFC 5766 HMAC-SHA1 credentials for Coturn / Twilio relays.',
-                    'Persistent Device Registry: Pairing generates a cryptographically random 256-bit secret stored in localStorage.',
-                    'Cryptographic Replay Protection: Pairing and session requests require single-use nonces and valid timestamps (±60s).',
-                    'Sliding-Window Rate Limiting: 5 consecutive failed authentication attempts triggers a 5-minute client lockout.',
-                    'Zero-Tolerance Revocation: Revoking an authorized device drops its active sessions, screen stream, and input rights immediately.',
-                    'Host UIPI Boundaries: Agent runs as normal user by default; elevated UI (UAC / Ctrl+Alt+Del) remains guarded by Windows.',
+                    'Approved Roots Only: Access is strictly confined to predefined user folders (Downloads, Documents, Desktop, Pictures).',
+                    'Path Traversal Defense: All paths are canonicalized; directory escape attempts (../, ..\\) are rejected with HTTP 403.',
+                    'Symlink Escape Prevention: Symbolic links resolving outside approved roots are blocked.',
+                    'Sensitive File Filtering: System files, credentials (.ssh, .env, id_rsa), and browser profiles (AppData) are blacklisted.',
+                    'Upload Size Limit: Enforces a 50 MB per-file upload cap with automatic partial-file purge on violation.',
+                    'Predefined Application Allowlist: Only approved executables can be launched; no arbitrary commands or scripts accepted.',
+                    'Disruptive App Confirmation: Launching administrative or terminal tools requires explicit user confirmation.',
                   ]
                 )
               }
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
             >
-              <span>Stage 6 Specs</span>
+              <span>Stage 7 Specs</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -738,7 +738,12 @@ export const App: React.FC = () => {
               onSendText={handleSendText}
               onSendShortcut={handleSendShortcut}
             />
-            <ApplicationsSection onOpenInfo={handleOpenInfo} />
+            <ApplicationsSection
+              agentUrl={agentUrl}
+              token={sessionToken}
+              isConnected={connectionStatus === 'connected'}
+              onOpenInfo={handleOpenInfo}
+            />
           </div>
 
           {/* Right Column: Telemetry & File Management (4 columns) */}
@@ -749,7 +754,12 @@ export const App: React.FC = () => {
               onOpenInfo={handleOpenInfo}
               onRefresh={() => sessionToken && fetchTelemetry(agentUrl, sessionToken)}
             />
-            <FileTransferSection onOpenInfo={handleOpenInfo} />
+            <FileTransferSection
+              agentUrl={agentUrl}
+              token={sessionToken}
+              isConnected={connectionStatus === 'connected'}
+              onOpenInfo={handleOpenInfo}
+            />
           </div>
         </div>
 
@@ -805,11 +815,21 @@ export const App: React.FC = () => {
           )}
 
           {activeTab === 'files' && (
-            <FileTransferSection onOpenInfo={handleOpenInfo} />
+            <FileTransferSection
+              agentUrl={agentUrl}
+              token={sessionToken}
+              isConnected={connectionStatus === 'connected'}
+              onOpenInfo={handleOpenInfo}
+            />
           )}
 
           {activeTab === 'apps' && (
-            <ApplicationsSection onOpenInfo={handleOpenInfo} />
+            <ApplicationsSection
+              agentUrl={agentUrl}
+              token={sessionToken}
+              isConnected={connectionStatus === 'connected'}
+              onOpenInfo={handleOpenInfo}
+            />
           )}
 
           {activeTab === 'system' && (
@@ -832,7 +852,7 @@ export const App: React.FC = () => {
             <span>Mobile-to-Windows Remote Control System</span>
           </div>
           <div className="text-[11px] text-slate-400">
-            Stage 6 Remote NAT Traversal • WebRTC DTLS-SRTP & TURN Relay
+            Stage 7 Restricted Files & App Launcher • Windows 10/11 Host
           </div>
         </div>
       </footer>

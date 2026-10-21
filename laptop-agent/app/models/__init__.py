@@ -32,6 +32,20 @@ from app.models.remote import (
     DeviceRevokeResponse,
     IceServerConfigResponse,
 )
+from app.models.files import (
+    ApprovedRootItem,
+    ApprovedRootsResponse,
+    FileItem,
+    DirectoryListingResponse,
+    CreateFolderRequest,
+    FileOperationResponse,
+)
+from app.models.apps import (
+    AllowlistedAppItem,
+    AppAllowlistResponse,
+    LaunchAppRequest,
+    LaunchAppResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -68,4 +82,14 @@ __all__ = [
     "DeviceListResponse",
     "DeviceRevokeResponse",
     "IceServerConfigResponse",
+    "ApprovedRootItem",
+    "ApprovedRootsResponse",
+    "FileItem",
+    "DirectoryListingResponse",
+    "CreateFolderRequest",
+    "FileOperationResponse",
+    "AllowlistedAppItem",
+    "AppAllowlistResponse",
+    "LaunchAppRequest",
+    "LaunchAppResponse",
 ]

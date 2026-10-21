@@ -15,6 +15,8 @@ from app.routers import (
     health_router,
     input_router,
     remote_router,
+    files_router,
+    apps_router,
     stream_router,
     system_router,
 )
@@ -53,9 +55,9 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description=(
-        "PocketDesk Windows Laptop Agent (Stage 6). "
-        "Provides authenticated local and remote WebRTC desktop streaming, "
-        "interactive touch/mouse/keyboard injection, and secure NAT traversal with replay defense."
+        "PocketDesk Windows Laptop Agent (Stage 7). "
+        "Provides authenticated WebRTC desktop streaming, remote mouse/keyboard control, "
+        "restricted filesystem browsing/file transfer, and allowlisted application launching."
     ),
     lifespan=lifespan,
     docs_url="/docs",
@@ -109,6 +111,8 @@ async def root():
         "input_status": "/api/input/status",
         "remote_devices": "/api/remote/devices",
         "ice_servers": "/api/remote/ice-servers",
+        "files_roots": "/api/files/roots",
+        "apps_allowlist": "/api/apps/allowlist",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -121,3 +125,5 @@ app.include_router(capabilities_router)
 app.include_router(stream_router)
 app.include_router(input_router)
 app.include_router(remote_router)
+app.include_router(files_router)
+app.include_router(apps_router)

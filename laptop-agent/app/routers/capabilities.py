@@ -58,16 +58,16 @@ REGISTERED_CAPABILITIES = [
         description="Virtual keyboard stroke injection, Unicode text entry, and Windows hotkey dispatches."
     ),
     CapabilityItem(
-        name="process_management",
-        status="planned",
-        stage=4,
-        description="Listing running Windows processes and non-elevated app launching."
+        name="restricted_file_management",
+        status="available",
+        stage=7,
+        description="Restricted filesystem browsing, uploading, downloading, and folder creation in explicitly approved user directories."
     ),
     CapabilityItem(
-        name="file_transfer",
-        status="planned",
-        stage=5,
-        description="Chunked binary file upload and download with SHA-256 integrity verification."
+        name="application_launcher",
+        status="available",
+        stage=7,
+        description="Allowlist-restricted launching of approved installed Windows applications with confirmation for disruptive tools."
     ),
     CapabilityItem(
         name="remote_nat_traversal",

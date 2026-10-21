@@ -127,3 +127,54 @@ export interface IceServerConfig {
   nat_traversal_mode: string;
   documentation: string;
 }
+
+// Stage 7: File Management Types
+export interface ApprovedRoot {
+  id: string;
+  name: string;
+  display_path: string;
+}
+
+export interface FileItem {
+  name: string;
+  path: string;
+  is_dir: boolean;
+  size_bytes: number;
+  modified_at: string;
+  extension: string;
+  is_hidden: boolean;
+}
+
+export interface DirectoryListing {
+  root_id: string;
+  root_name: string;
+  current_path: string;
+  parent_path: string | null;
+  items: FileItem[];
+  can_upload: boolean;
+  can_create_folder: boolean;
+}
+
+export interface UploadProgress {
+  fileName: string;
+  progressPercent: number;
+  status: 'idle' | 'uploading' | 'completed' | 'error';
+  errorMessage?: string;
+}
+
+// Stage 7: Application Launcher Types
+export interface AllowlistedApp {
+  app_id: string;
+  name: string;
+  description: string;
+  icon_name: string;
+  is_disruptive: boolean;
+  is_installed: boolean;
+}
+
+export interface LaunchAppResult {
+  success: boolean;
+  message: string;
+  app_id: string;
+  pid?: number;
+}

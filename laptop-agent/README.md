@@ -1,8 +1,8 @@
 # PocketDesk Laptop Agent (Windows 10/11)
 
-> **Status:** Stage 6 implemented. Supports secure remote internet access, WebRTC NAT traversal (dynamic STUN/TURN), persistent device pairing, cryptographic replay protection, sliding-window rate limiting, live hardware telemetry, screen streaming, and remote mouse/keyboard control.
+> **Status:** Stage 7 implemented (v0.7.0). Supports restricted filesystem management (browsing, downloading, uploading, folder creation in approved roots), allowlist-restricted application launching with disruptive action confirmation, secure remote internet access via WebRTC NAT traversal, live hardware telemetry, screen streaming, and remote mouse/keyboard control.
 
-The PocketDesk Laptop Agent is a lightweight Python service built on **FastAPI** that runs locally on your Windows 10 or 11 laptop. It provides terminal-authorized device pairing, system health reporting, live hardware telemetry, user-initiated WebRTC screen capture, safe Win32 mouse/keyboard injection, and production-grade NAT traversal over the internet.
+The PocketDesk Laptop Agent is a lightweight Python service built on **FastAPI** that runs locally on your Windows 10 or 11 laptop. It provides terminal-authorized device pairing, system health reporting, live hardware telemetry, user-initiated WebRTC screen capture, safe Win32 mouse/keyboard injection, production-grade NAT traversal, safe file operations, and allowlisted application launching.
 
 ---
 
@@ -35,6 +35,14 @@ The PocketDesk Laptop Agent is a lightweight Python service built on **FastAPI**
 | `GET` | `/api/remote/devices` | List all authorized devices paired with host | Bearer Token Required | `DeviceListResponse` |
 | `POST` | `/api/remote/devices/{id}/revoke`| Instantly revoke trusted device & active streams | Bearer Token Required | `DeviceRevokeResponse` |
 | `GET` | `/api/remote/ice-servers` | Get dynamic STUN + RFC 5766 TURN credentials | Bearer Token Required | `IceServerConfigResponse` |
+| **Stage 7 File & App Endpoints** | | | | |
+| `GET` | `/api/files/roots` | List approved filesystem roots (Downloads, Documents, Desktop) | Bearer Token Required | `ApprovedRootsResponse` |
+| `GET` | `/api/files/list` | List directory contents with path traversal defense | Bearer Token Required | `DirectoryListingResponse` |
+| `GET` | `/api/files/download` | Download authorized file from approved root | Bearer Token Required | Binary Stream |
+| `POST` | `/api/files/upload` | Upload file to approved root (50 MB limit) | Bearer Token Required | `FileOperationResponse` |
+| `POST` | `/api/files/mkdir` | Create subdirectory with strict name sanitization | Bearer Token Required | `FileOperationResponse` |
+| `GET` | `/api/apps/allowlist` | List allowlisted installed Windows applications | Bearer Token Required | `AppAllowlistResponse` |
+| `POST` | `/api/apps/launch` | Launch allowlisted application by ID | Bearer Token Required | `LaunchAppResponse` |
 
 ---
 
@@ -52,12 +60,14 @@ The PocketDesk Laptop Agent is a lightweight Python service built on **FastAPI**
 
 ### Mode 1: Local Wi-Fi Access Mode
 ```powershell
+cd laptop-agent
+.\.venv\Scripts\Activate.ps1
 python run.py --lan
 ```
 Terminal output:
 ```
 ==================================================
-  PocketDesk Laptop Agent v0.6.0 (Stage 6)
+  PocketDesk Laptop Agent v0.7.0 (Stage 7)
   Mode: Local Wi-Fi Network Access enabled
   Listening on all interfaces: http://0.0.0.0:8000
   Phone Connection URL: http://192.168.1.145:8000
@@ -70,7 +80,6 @@ Terminal output:
 ### Mode 2: Remote Internet Access Mode (Behind Reverse Proxy)
 When using a reverse proxy (Caddy / Nginx / Cloudflare Tunnel):
 ```powershell
-# Set environment variables for TURN relay and local binding
 $env:POCKETDESK_HOST="127.0.0.1"
 $env:POCKETDESK_TURN_URL="turn:turn.yourdomain.com:3478"
 $env:POCKETDESK_TURN_SECRET="your-256bit-turn-secret"
@@ -81,22 +90,25 @@ For complete reverse proxy and Coturn setup, consult [`docs/deployment_guide.md`
 
 ---
 
-## Stage 6 Security Controls & Hardening
+## Stage 7 Security Controls & Hardening
 
-1. **Persistent Device Registry & 256-bit Secrets:**
-   Initial pairing generates a cryptographically random 256-bit secret stored in `data/devices.json` and client `localStorage`.
+1. **Approved Roots Only:**
+   File operations are strictly confined to approved roots (Downloads, Documents, Desktop, Pictures) or configured via `POCKETDESK_ALLOWED_ROOTS`. Arbitrary system directories cannot be accessed.
 
-2. **Cryptographic Replay Protection:**
-   Pairing and session requests must include a timestamp within $\pm 60$ seconds and a single-use UUID nonce. Replayed nonces are rejected with HTTP 400.
+2. **Canonical Path Traversal & Symlink Defense:**
+   All paths are canonicalized via `Path.resolve()`. Any path escaping the approved root (`../`, `..\`, absolute paths, null bytes, symlinks) is rejected with **HTTP 403 Forbidden**.
 
-3. **Sliding-Window Rate Limiting:**
-   After 5 consecutive failed authentication attempts, client IP is locked out for 300 seconds (HTTP 429).
+3. **Sensitive Pattern & Credential Blacklisting:**
+   The agent hides and blocks access to credentials (`.ssh`, `.env`, `id_rsa`), configuration files, browser profiles (`AppData`), and dangerous scripts (`*.bat`, `*.cmd`, `*.ps1`).
 
-4. **Dynamic RFC 5766 TURN Ephemeral Credentials:**
-   TURN relay passwords are generated dynamically on demand using HMAC-SHA1 over the timestamp and shared secret.
+4. **Upload Size Limits & Safe Storage:**
+   Enforces a strict 50 MB per-file upload limit. Partially written files are automatically deleted upon limit violation.
 
-5. **Instant Revocation Kill Switch:**
-   Revoking a device immediately invalidates its secret, closes active WebRTC media tracks, and halts input injection.
+5. **Predefined Application Allowlist (Zero Shell Commands):**
+   The browser only provides an immutable `app_id` (e.g. `notepad`, `calc`, `taskmgr`). The agent executes predefined paths using `subprocess.Popen(..., shell=False)`. No arbitrary commands or shell strings are accepted.
+
+6. **Confirmation for Disruptive Actions:**
+   Administrative or system tools (e.g. `taskmgr`, `terminal`) require explicit user confirmation before execution.
 
 ---
 
@@ -104,16 +116,16 @@ For complete reverse proxy and Coturn setup, consult [`docs/deployment_guide.md`
 
 ### Run Automated Test Suite
 ```powershell
-cd C:\Users\gaura\.gemini\antigravity\scratch\pocketdesk\laptop-agent
+cd laptop-agent
 .\.venv\Scripts\pytest.exe -v
 ```
-All **34 automated tests** verify:
-- Device registration, 256-bit secret creation, and role management
-- Cryptographic replay protection and expired timestamp rejection
-- Sliding-window rate limiter lockouts
-- Device revocation and active session termination
-- Dynamic STUN + RFC 5766 TURN credential generation
-- Win32 coordinate mapping and boundary clamping
-- Input validation (rejection of unwhitelisted keys and oversized text payloads)
-- Authentication enforcement on all sensitive endpoints
-- Safe key and mouse button release during cleanup
+All **53 automated tests** verify:
+- Approved root discovery and directory listing
+- Path traversal rejection across multiple vectors (`../`, absolute paths, null bytes)
+- Sensitive file blacklisting (`.env`, `id_rsa`, `.key`)
+- File upload streaming and 50 MB size limit enforcement
+- Safe folder creation and Windows reserved name rejection (`CON`, `PRN`, etc.)
+- Application allowlist queries and arbitrary command rejection
+- Confirmation enforcement for disruptive applications
+- Device registration, 256-bit secret creation, replay protection, and rate limiting
+- Win32 coordinate mapping, input boundaries, and WebRTC streaming
