@@ -82,3 +82,18 @@ PocketDesk is built incrementally in accordance with strict engineering guidelin
   - Mandatory confirmation gates for screenshot captures and disruptive applications.
   - Interactive AI Assistant frontend section with prompt suggestion chips, proposed action preview cards, and rich result views (base64 screenshot modal, telemetry cards, file lists).
   - Traceable security audit logging with audit IDs.
+
+---
+
+### Stage 9: Dedicated Android Application *(Completed)*
+- **Objective:** Provide a dedicated Android interface for accessing the user's Windows laptop, reusing existing backend APIs and authentication.
+- **Deliverables:**
+  - Standalone Android React Native application (`android-app/`) with TypeScript.
+  - Android KeyStore / AES-256 GCM encrypted credential storage (`SecureStorageService`).
+  - Minimal Android permissions model (INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE).
+  - Android `AppState` lifecycle management: automatically pauses WebRTC video stream, terminates input, and sends emergency stop upon backgrounding.
+  - Registered laptops profile manager: switch, save, and delete laptop targets.
+  - Interactive touch-to-desktop mouse gesture mapper with aspect-ratio letterboxing compensation.
+  - Virtual keyboard drawer with Windows hotkey triggers (`Win`, `Ctrl+C`, `Alt+Tab`, `Esc`, `Tab`).
+  - Restricted file management, allowlist application launching, live hardware telemetry, and AI command interface.
+  - Comprehensive automated test suite (12/12 unit tests passing).

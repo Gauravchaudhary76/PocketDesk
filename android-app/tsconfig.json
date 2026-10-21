@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "lib": ["es2022", "dom"],
+    "allowJs": true,
+    "jsx": "react-native",
+    "noEmit": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "types": ["node"],
+    "typeRoots": [
+      "../frontend/node_modules/@types",
+      "./src/types"
+    ]
+  },
+  "include": [
+    "src/**/*",
+    "tests/**/*",
+    "index.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "android",
+    "build"
+  ]
+}

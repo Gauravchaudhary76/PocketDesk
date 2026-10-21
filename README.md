@@ -39,6 +39,14 @@ Development proceeds incrementally in stages, starting with a clean local protot
   - On-screen virtual keyboard supporting special navigation keys (`Enter`, `Esc`, `Tab`, `Backspace`, arrows).
   - Safety controls: Default-disabled input with explicit consent confirmation modal and persistent Emergency Stop button.
 
+### Android Application (Stage 9 — Current)
+- **Framework:** Dedicated React Native + TypeScript application (`android-app/`).
+- **WebRTC Transport:** Android native `react-native-webrtc` binding with hardware-accelerated H.264/VP8 video decoding.
+- **Security & Storage:** Hardware-backed `EncryptedSharedPreferences` / Android KeyStore for 256-bit device secrets (`SecureStorageService`). Memory-isolated short-lived session tokens (1-hour TTL).
+- **App Lifecycle & Backgrounding:** Android `AppState` event handling that automatically pauses video streams, suspends polling, and emergency-stops active inputs upon app backgrounding.
+- **Permissions:** Strictly minimal Android permissions (`INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`). Zero camera/mic and zero broad storage permissions.
+- **Features:** Registered laptop profile manager, WebRTC screen streaming, touch gesture mouse mapping, on-screen keyboard with Windows hotkeys, restricted file manager, allowlisted app launcher, hardware telemetry, and AI command interface.
+
 ### Laptop Agent (Stages 2 through 8 — Current)
 - **Framework:** Python 3.10+ with FastAPI, Uvicorn, and `python-multipart`
 - **Validation:** Pydantic v2 data models with strict input bounds
@@ -78,6 +86,19 @@ Development proceeds incrementally in stages, starting with a clean local protot
 
 ```
 pocketdesk/
+├── android-app/              # Dedicated Android React Native Application (Stage 9)
+│   ├── android/              # Native Android configuration (Gradle, Manifest, Kotlin)
+│   │   ├── app/src/main/     # AndroidManifest.xml, MainActivity.kt, MainApplication.kt
+│   │   └── build.gradle      # Native dependencies (libwebrtc, security-crypto)
+│   ├── src/
+│   │   ├── components/       # Header.tsx (Android status, mode & emergency stop)
+│   │   ├── screens/          # ConnectScreen, RemoteDesktopScreen, FilesScreen, AppsScreen, SystemScreen, AssistantScreen
+│   │   ├── services/         # secureStorage, auth, webrtc, input, files, apps, assistant
+│   │   ├── types/            # TypeScript domain models
+│   │   └── App.tsx           # Android root application component & AppState listener
+│   ├── tests/                # Automated unit tests (12 tests)
+│   ├── package.json
+│   └── tsconfig.json
 ├── frontend/                 # React + Vite + TypeScript web dashboard (Stages 1 - 8)
 │   ├── src/
 │   │   ├── components/       # Reusable UI components
@@ -124,6 +145,7 @@ pocketdesk/
 │   └── README.md             # Virtual environment setup & usage guide
 ├── docs/                     # Engineering architecture, deployment & security guides
 │   ├── architecture.md       # High-level component interactions & data flow
+│   ├── android_application_guide.md # Stage 9 Android architecture, KeyStore security & build guide
 │   ├── deployment_guide.md   # Production deployment options (Mesh overlay vs Reverse Proxy + Coturn)
 │   ├── security_checklist.md # Threat model, HTTPS warning, and verification procedures
 │   ├── ai_command_interface.md # Stage 8 AI command interface, rule parser & confirmation gates
@@ -146,6 +168,7 @@ pocketdesk/
 
 ## Documentation
 
+- **Android Application Guide (Stage 9):** [`docs/android_application_guide.md`](docs/android_application_guide.md)
 - **AI Desktop Interface (Stage 8):** [`docs/ai_command_interface.md`](docs/ai_command_interface.md)
 - **File Manager & App Launcher (Stage 7):** [`docs/file_management_and_app_launcher.md`](docs/file_management_and_app_launcher.md)
 - **Deployment Guide:** [`docs/deployment_guide.md`](docs/deployment_guide.md)
@@ -166,39 +189,32 @@ pocketdesk/
    .\.venv\Scripts\Activate.ps1
    python run.py --lan
    ```
-3. **Start Web Frontend:**
+3. **Start Web Frontend (or launch Android app):**
    ```powershell
    cd frontend
    npm run dev -- --host
    ```
-4. On your phone, open the frontend, select **"Local Wi-Fi Mode"**, enter the 6-digit PIN, and connect.
+4. On your phone (via browser or dedicated Android app), select **"Local Wi-Fi Mode"**, enter the 6-digit PIN, and connect.
 
-### 2. Testing Stage 7 Features
-1. **File Management:**
-   - Go to the **Files** section in the web interface.
-   - Switch between approved root tabs (Downloads, Documents, Desktop, Pictures).
-   - Click a folder to browse contents; use the breadcrumbs or the `..` button to navigate up.
-   - Click the download icon to save a file to your phone.
-   - Click **Upload** to send a file to the active folder (with live percentage progress).
-   - Click **New Folder** to create a subdirectory.
-2. **Application Launching:**
-   - Go to the **Apps** section in the web interface.
-   - Click the **Play** button on **Calculator** or **Notepad**; verify it opens on your Windows host desktop.
-   - Click the **Play** button on a disruptive application (such as **Task Manager** or **Terminal**); verify that a confirmation modal appears before launching.
-
-### 3. Testing Stage 8 Features (AI Desktop Command Interface)
-1. **Natural Language Instructions:**
-   - Navigate to the **AI Assistant** section (or the **AI** tab on mobile).
-   - Click a suggestion chip (e.g. `"Check battery & system"`, `"Open Notepad"`, `"Search for pdf files"`).
-   - Click **Interpret** to generate the proposed desktop action card.
-   - Verify the proposed action preview shows the correct intent, parameter badges, and risk level.
-2. **Confirmation Gates:**
-   - Enter `"take screenshot"` and click **Interpret**.
-   - Notice that the proposed action card flags `requires_confirmation: true`.
-   - Click **Confirm & Execute**; verify that a live screenshot thumbnail is rendered and can be clicked to view in a high-resolution modal.
-3. **Prohibited Destructive Command Blocking:**
-   - Enter `"format c:"` or `"delete all files"` or `"powershell rm -rf"`.
-   - Click **Interpret** and observe immediate rejection (`risk_level: "prohibited"`). Execution is completely blocked.
+### 2. Testing Stage 9 Features (Dedicated Android App)
+1. **Registered Laptops:**
+   - In `android-app`, open the **Connect** tab.
+   - Pair with your laptop using the terminal PIN.
+   - Verify that your laptop profile appears in the **Registered Laptops** list.
+   - Switch between saved laptops or remove a profile.
+2. **Remote Desktop & Touch Gestures:**
+   - Go to the **Screen** tab and tap **Start Stream**.
+   - Tap **Enable Input** and confirm the authorization prompt.
+   - Tap to click, double tap to double click, and drag to move the Windows cursor.
+   - Tap **Disable Input** or the top red **STOP INPUT** button to verify immediate emergency input cessation.
+3. **Files, Apps, System & AI Command Interface:**
+   - Browse approved files in the **Files** tab.
+   - Launch Notepad or Calculator in the **Apps** tab.
+   - Inspect live CPU, RAM, and battery metrics in the **System** tab.
+   - Submit natural language instructions in the **AI** tab (e.g. `"take screenshot"`, `"battery status"`).
+4. **App Backgrounding Lifecycle:**
+   - Background the app (or switch to another app).
+   - Verify that streaming pauses, remote input is disabled, and any held modifiers are released.
 
 ---
 
@@ -210,10 +226,16 @@ cd laptop-agent
 .\.venv\Scripts\pytest.exe -v
 ```
 
+Run the automated test suite in `android-app/`:
+```powershell
+cd android-app
+npm test
+```
+
 Run the frontend TypeScript & Vite production build:
 ```powershell
 cd frontend
 npm run build
 ```
 
-Both test suites pass with **100% success** (66 Python tests + clean Vite build).
+All test suites pass with **100% success** (66 Python tests + 12 Android unit tests + clean Vite build).
