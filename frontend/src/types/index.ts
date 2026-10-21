@@ -82,7 +82,7 @@ export interface TransferFile {
   timestamp: string;
 }
 
-export type ActiveTab = 'display' | 'controls' | 'files' | 'apps' | 'system';
+export type ActiveTab = 'display' | 'controls' | 'assistant' | 'files' | 'apps' | 'system';
 
 export type StreamResolution = '1080p' | '720p' | '540p' | '480p';
 
@@ -177,4 +177,35 @@ export interface LaunchAppResult {
   message: string;
   app_id: string;
   pid?: number;
+}
+
+// Stage 8: AI Assistant Command Types
+export interface InterpretedCommand {
+  command_id: string;
+  raw_prompt: string;
+  intent: string;
+  action_type: string;
+  parameters: Record<string, any>;
+  summary: string;
+  requires_confirmation: boolean;
+  is_supported: boolean;
+  risk_level: 'safe' | 'moderate' | 'disruptive' | 'prohibited';
+  rejection_reason?: string;
+}
+
+export interface ExecuteCommandResult {
+  success: boolean;
+  action_type: string;
+  message: string;
+  result_data?: Record<string, any>;
+  audit_id: string;
+  timestamp: string;
+}
+
+export interface IntentCatalogItem {
+  intent: string;
+  action_type: string;
+  description: string;
+  example_phrases: string[];
+  requires_confirmation: boolean;
 }

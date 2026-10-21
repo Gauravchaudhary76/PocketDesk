@@ -11,8 +11,8 @@ class Settings:
     """Application configuration for PocketDesk Laptop Agent."""
 
     APP_NAME: str = "PocketDesk Laptop Agent"
-    APP_VERSION: str = "0.7.0"
-    STAGE: int = 7
+    APP_VERSION: str = "0.8.0"
+    STAGE: int = 8
 
     # Storage Directory for Persistent Authorized Devices
     STORAGE_DIR: str = os.getenv("POCKETDESK_STORAGE_DIR", "storage")

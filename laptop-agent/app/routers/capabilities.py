@@ -75,6 +75,12 @@ REGISTERED_CAPABILITIES = [
         stage=6,
         description="Secure remote access via WebRTC NAT traversal (STUN) and authenticated TURN relay with replay defense."
     ),
+    CapabilityItem(
+        name="ai_command_interface",
+        status="available",
+        stage=8,
+        description="Local natural-language desktop command parser with intent verification and confirmation guards."
+    ),
 ]
 
 

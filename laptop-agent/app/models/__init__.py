@@ -46,6 +46,14 @@ from app.models.apps import (
     LaunchAppRequest,
     LaunchAppResponse,
 )
+from app.models.assistant import (
+    ParseCommandRequest,
+    InterpretedCommandResponse,
+    ExecuteCommandRequest,
+    ExecuteCommandResponse,
+    IntentCatalogItem,
+    IntentCatalogResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -92,4 +100,10 @@ __all__ = [
     "AppAllowlistResponse",
     "LaunchAppRequest",
     "LaunchAppResponse",
+    "ParseCommandRequest",
+    "InterpretedCommandResponse",
+    "ExecuteCommandRequest",
+    "ExecuteCommandResponse",
+    "IntentCatalogItem",
+    "IntentCatalogResponse",
 ]

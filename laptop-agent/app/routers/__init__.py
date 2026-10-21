@@ -8,6 +8,7 @@ from app.routers.input import router as input_router
 from app.routers.remote import router as remote_router
 from app.routers.files import router as files_router
 from app.routers.apps import router as apps_router
+from app.routers.assistant import router as assistant_router
 
 __all__ = [
     "health_router",
@@ -19,4 +20,5 @@ __all__ = [
     "remote_router",
     "files_router",
     "apps_router",
+    "assistant_router",
 ]

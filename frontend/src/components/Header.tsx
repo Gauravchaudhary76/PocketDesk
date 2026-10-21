@@ -33,7 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
                 PocketDesk
               </h1>
               <span className="text-[10px] uppercase font-semibold tracking-wider px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                v0.7.0 • Stage 7
+                v0.8.0 • Stage 8
               </span>
               <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800">
                 {connectionMode === 'remote' ? (
@@ -131,9 +131,9 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             onClick={() =>
               onOpenStageInfo(
-                7,
+                8,
                 'PocketDesk Architecture & Stage Roadmap',
-                'PocketDesk is built incrementally following strict engineering rules. Stage 7 delivers restricted filesystem browsing, uploads, downloads, and allowlisted Windows application launching.',
+                'PocketDesk is built incrementally following strict engineering rules. Stage 8 delivers an AI-assisted desktop command interface mapping natural language to safe, rule-validated desktop actions without external paid APIs.',
                 [
                   'Stage 1: Frontend Prototype, UI Dashboard & Responsive Layout (Completed)',
                   'Stage 2: Python FastAPI Agent Foundation & Local Telemetry (Completed)',
@@ -141,7 +141,8 @@ export const Header: React.FC<HeaderProps> = ({
                   'Stage 4: Authenticated WebRTC Desktop Video Streaming (Completed)',
                   'Stage 5: Low-latency Input Dispatch (Mouse, Keyboard, Touch) (Completed)',
                   'Stage 6: Encrypted WebRTC & Dynamic TURN Traversal for Remote Internet Access (Completed)',
-                  'Stage 7: Restricted File Management & Application Launcher (Current Stage)',
+                  'Stage 7: Restricted File Management & Application Launcher (Completed)',
+                  'Stage 8: AI-Assisted Desktop Command Interface (Current Stage)',
                 ]
               )
             }

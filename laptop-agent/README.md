@@ -1,8 +1,8 @@
 # PocketDesk Laptop Agent (Windows 10/11)
 
-> **Status:** Stage 7 implemented (v0.7.0). Supports restricted filesystem management (browsing, downloading, uploading, folder creation in approved roots), allowlist-restricted application launching with disruptive action confirmation, secure remote internet access via WebRTC NAT traversal, live hardware telemetry, screen streaming, and remote mouse/keyboard control.
+> **Status:** Stage 8 implemented (v0.8.0). Supports AI-assisted desktop command interface via local rule-based intent parsing, restricted filesystem management, allowlist-restricted application launching with confirmation gates, secure remote internet access via WebRTC NAT traversal, live hardware telemetry, screen streaming, and remote mouse/keyboard control.
 
-The PocketDesk Laptop Agent is a lightweight Python service built on **FastAPI** that runs locally on your Windows 10 or 11 laptop. It provides terminal-authorized device pairing, system health reporting, live hardware telemetry, user-initiated WebRTC screen capture, safe Win32 mouse/keyboard injection, production-grade NAT traversal, safe file operations, and allowlisted application launching.
+The PocketDesk Laptop Agent is a lightweight Python service built on **FastAPI** that runs locally on your Windows 10 or 11 laptop. It provides terminal-authorized device pairing, system health reporting, live hardware telemetry, user-initiated WebRTC screen capture, safe Win32 mouse/keyboard injection, production-grade NAT traversal, safe file operations, allowlisted application launching, and an AI-assisted desktop command interface.
 
 ---
 
@@ -43,6 +43,10 @@ The PocketDesk Laptop Agent is a lightweight Python service built on **FastAPI**
 | `POST` | `/api/files/mkdir` | Create subdirectory with strict name sanitization | Bearer Token Required | `FileOperationResponse` |
 | `GET` | `/api/apps/allowlist` | List allowlisted installed Windows applications | Bearer Token Required | `AppAllowlistResponse` |
 | `POST` | `/api/apps/launch` | Launch allowlisted application by ID | Bearer Token Required | `LaunchAppResponse` |
+| **Stage 8 AI Command Endpoints** | | | | |
+| `GET` | `/api/assistant/intents` | List supported AI desktop intents and specifications | Bearer Token Required | `IntentCatalogResponse` |
+| `POST` | `/api/assistant/parse` | Parse natural language prompt into proposed action | Bearer Token Required | `InterpretedCommandResponse` |
+| `POST` | `/api/assistant/execute` | Execute approved action with confirmation checks | Bearer Token Required | `ExecuteCommandResponse` |
 
 ---
 
@@ -110,6 +114,12 @@ For complete reverse proxy and Coturn setup, consult [`docs/deployment_guide.md`
 6. **Confirmation for Disruptive Actions:**
    Administrative or system tools (e.g. `taskmgr`, `terminal`) require explicit user confirmation before execution.
 
+7. **Stage 8 AI Intent Parsing & Zero Shell Execution:**
+   - Deterministic NLP parser maps natural-language prompts to strongly-typed internal functions without calling external paid APIs or cloud models.
+   - Prohibited destructive patterns (`rm`, `format`, `shutdown`, `drop`, `curl`) are rejected with audit alerts.
+   - Mandatory two-stage confirmation gate enforces user consent before taking screenshots or launching disruptive apps.
+   - Every parsed and executed command produces a traceable security audit log with an audit ID.
+
 ---
 
 ## Testing the Agent
@@ -119,7 +129,11 @@ For complete reverse proxy and Coturn setup, consult [`docs/deployment_guide.md`
 cd laptop-agent
 .\.venv\Scripts\pytest.exe -v
 ```
-All **53 automated tests** verify:
+All **66 automated tests** verify:
+- AI natural language intent parsing and parameter extraction
+- Prohibited destructive command blocking (`rm`, `format`, `powershell`, `shutdown`)
+- Confirmation enforcement for screenshot captures and disruptive applications
+- Safe execution of system telemetry reporting, app launching, and approved file searches
 - Approved root discovery and directory listing
 - Path traversal rejection across multiple vectors (`../`, absolute paths, null bytes)
 - Sensitive file blacklisting (`.env`, `id_rsa`, `.key`)

@@ -13,6 +13,7 @@ import { RemoteDisplay } from './components/RemoteDisplay';
 import { MouseKeyboardSection } from './components/MouseKeyboardSection';
 import { FileTransferSection } from './components/FileTransferSection';
 import { ApplicationsSection } from './components/ApplicationsSection';
+import { AssistantSection } from './components/AssistantSection';
 import { SystemMonitorSection } from './components/SystemMonitorSection';
 import { ConnectModal } from './components/ConnectModal';
 import { DeviceManagementModal } from './components/DeviceManagementModal';
@@ -26,6 +27,7 @@ import {
   FolderUp,
   LayoutGrid,
   Activity,
+  Sparkles,
   ChevronRight,
   Info,
   Globe,
@@ -536,6 +538,7 @@ export const App: React.FC = () => {
   const tabs: { id: ActiveTab; label: string; icon: React.FC<{ className?: string }> }[] = [
     { id: 'display', label: 'Screen', icon: Monitor },
     { id: 'controls', label: 'Controls', icon: Mouse },
+    { id: 'assistant', label: 'AI Assistant', icon: Sparkles },
     { id: 'files', label: 'Files', icon: FolderUp },
     { id: 'apps', label: 'Apps', icon: LayoutGrid },
     { id: 'system', label: 'System', icon: Activity },
@@ -560,19 +563,19 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Stage 7 Scope Announcement Banner */}
-        <div className="bg-gradient-to-r from-blue-950/60 via-slate-900/80 to-indigo-950/60 border border-blue-900/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
+        {/* Stage 8 Scope Announcement Banner */}
+        <div className="bg-gradient-to-r from-blue-950/60 via-purple-950/40 to-indigo-950/60 border border-purple-900/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
           <div className="flex items-start gap-3">
-            <div className="p-2.5 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 shrink-0 mt-0.5">
-              <FolderUp className="w-5 h-5" />
+            <div className="p-2.5 rounded-xl bg-purple-600/20 border border-purple-500/30 text-purple-400 shrink-0 mt-0.5">
+              <Sparkles className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                  <FolderUp className="w-4 h-4 text-indigo-400" />
-                  Stage 7: Restricted File Manager & Application Launcher
+                  <Sparkles className="w-4 h-4 text-purple-400" />
+                  Stage 8: AI-Assisted Desktop Command Interface
                 </h2>
-                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   Active Stage
                 </span>
                 {connectionMode === 'remote' && (
@@ -587,7 +590,7 @@ export const App: React.FC = () => {
                 )}
               </div>
               <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
-                Browse, upload, and download files within approved laptop folders (Downloads, Documents, Desktop) with canonical path traversal defense and 50MB upload limits. Launch approved Windows applications via a strict predefined allowlist.
+                Submit natural-language instructions from phone and map them to a restricted set of authorized desktop actions (apps, telemetry, files, streaming, screenshots) via local rule-based intent parsing with zero external paid APIs and zero shell execution.
               </p>
             </div>
           </div>
@@ -644,23 +647,22 @@ export const App: React.FC = () => {
               type="button"
               onClick={() =>
                 handleOpenInfo(
-                  7,
-                  'Stage 7 File Security & Application Launcher Specifications',
-                  'In Stage 7, PocketDesk implements safe, restricted file transfer and application launching with zero arbitrary shell execution.',
+                  8,
+                  'Stage 8 AI Desktop Command Interface Specifications',
+                  'In Stage 8, PocketDesk integrates a secure, local rule-based AI intent parser that translates natural language into structured desktop operations.',
                   [
-                    'Approved Roots Only: Access is strictly confined to predefined user folders (Downloads, Documents, Desktop, Pictures).',
-                    'Path Traversal Defense: All paths are canonicalized; directory escape attempts (../, ..\\) are rejected with HTTP 403.',
-                    'Symlink Escape Prevention: Symbolic links resolving outside approved roots are blocked.',
-                    'Sensitive File Filtering: System files, credentials (.ssh, .env, id_rsa), and browser profiles (AppData) are blacklisted.',
-                    'Upload Size Limit: Enforces a 50 MB per-file upload cap with automatic partial-file purge on violation.',
-                    'Predefined Application Allowlist: Only approved executables can be launched; no arbitrary commands or scripts accepted.',
-                    'Disruptive App Confirmation: Launching administrative or terminal tools requires explicit user confirmation.',
+                    'Zero External AI Dependency: Rule-based pattern classifier requires zero paid API keys, zero cloud LLMs, and zero external network calls.',
+                    'Zero Shell Command Execution: Instructions are mapped strictly to strongly-typed Python functions; no shell=True or bash/cmd/powershell strings are ever evaluated.',
+                    'Destructive Command Blocking: Prohibited patterns (format, delete, shutdown, drop, kill, curl) are immediately flagged and rejected with audit alerts.',
+                    'Explicit Confirmation Gates: Sensitive operations (desktop screenshots, disruptive applications) require secondary user confirmation before execution.',
+                    'Audited Execution: Every command parse and execution event generates a traceable audit record logged to security audit log with audit ID.',
+                    'Supported Actions: Launch allowlisted apps, query real-time system telemetry, search approved directories, control WebRTC streams, capture screenshots, and display help.',
                   ]
                 )
               }
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
             >
-              <span>Stage 7 Specs</span>
+              <span>Stage 8 Specs</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -744,6 +746,12 @@ export const App: React.FC = () => {
               isConnected={connectionStatus === 'connected'}
               onOpenInfo={handleOpenInfo}
             />
+            <AssistantSection
+              agentUrl={agentUrl}
+              token={sessionToken}
+              isConnected={connectionStatus === 'connected'}
+              onOpenInfo={handleOpenInfo}
+            />
           </div>
 
           {/* Right Column: Telemetry & File Management (4 columns) */}
@@ -814,6 +822,15 @@ export const App: React.FC = () => {
             />
           )}
 
+          {activeTab === 'assistant' && (
+            <AssistantSection
+              agentUrl={agentUrl}
+              token={sessionToken}
+              isConnected={connectionStatus === 'connected'}
+              onOpenInfo={handleOpenInfo}
+            />
+          )}
+
           {activeTab === 'files' && (
             <FileTransferSection
               agentUrl={agentUrl}
@@ -852,7 +869,7 @@ export const App: React.FC = () => {
             <span>Mobile-to-Windows Remote Control System</span>
           </div>
           <div className="text-[11px] text-slate-400">
-            Stage 7 Restricted Files & App Launcher • Windows 10/11 Host
+            Stage 8 AI Desktop Interface • Windows 10/11 Host
           </div>
         </div>
       </footer>
