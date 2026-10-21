@@ -71,9 +71,9 @@ REGISTERED_CAPABILITIES = [
     ),
     CapabilityItem(
         name="remote_nat_traversal",
-        status="planned",
+        status="available",
         stage=6,
-        description="End-to-end encrypted relay or WebRTC NAT traversal for out-of-LAN access."
+        description="Secure remote access via WebRTC NAT traversal (STUN) and authenticated TURN relay with replay defense."
     ),
 ]
 

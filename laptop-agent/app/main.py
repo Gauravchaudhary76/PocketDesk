@@ -14,10 +14,12 @@ from app.routers import (
     capabilities_router,
     health_router,
     input_router,
+    remote_router,
     stream_router,
     system_router,
 )
 from app.services.auth import AuthService
+from app.services.devices import DeviceRegistry
 from app.services.input import InputService
 from app.services.stream import StreamManager
 
@@ -34,8 +36,10 @@ async def lifespan(app: FastAPI):
     # Run security validation & display network endpoints
     settings.validate_security()
 
-    # Ensure a pairing PIN is initialized and displayed
+    # Initialize device registry and ensure pairing PINs are displayed
+    DeviceRegistry.initialize(settings.STORAGE_DIR)
     AuthService.get_active_code()
+    DeviceRegistry.get_active_pin()
 
     yield
 
@@ -49,8 +53,9 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description=(
-        "PocketDesk Windows Laptop Agent (Stage 5). "
-        "Provides authenticated local network system telemetry, WebRTC desktop screen streaming, and remote mouse/keyboard control."
+        "PocketDesk Windows Laptop Agent (Stage 6). "
+        "Provides authenticated local and remote WebRTC desktop streaming, "
+        "interactive touch/mouse/keyboard injection, and secure NAT traversal with replay defense."
     ),
     lifespan=lifespan,
     docs_url="/docs",
@@ -102,6 +107,8 @@ async def root():
         "capabilities": "/api/capabilities",
         "stream_status": "/api/stream/status",
         "input_status": "/api/input/status",
+        "remote_devices": "/api/remote/devices",
+        "ice_servers": "/api/remote/ice-servers",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -113,3 +120,4 @@ app.include_router(system_router)
 app.include_router(capabilities_router)
 app.include_router(stream_router)
 app.include_router(input_router)
+app.include_router(remote_router)

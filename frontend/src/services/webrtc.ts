@@ -7,6 +7,8 @@
 export interface StreamOptions {
   fps: number;
   resolution: '1080p' | '720p' | '540p' | '480p';
+  mode?: 'local' | 'remote';
+  iceServers?: RTCIceServer[];
 }
 
 export class WebRtcStreamClient {
@@ -16,6 +18,7 @@ export class WebRtcStreamClient {
 
   /**
    * Start a WebRTC screen-sharing session with the Windows agent.
+   * Supports local Wi-Fi mode (host ICE candidates) or remote internet mode (STUN/TURN).
    */
   async startStream(
     agentUrl: string,
@@ -30,9 +33,9 @@ export class WebRtcStreamClient {
     // Close any prior connection cleanly
     await this.stopStream();
 
-    // Local-only peer connection (empty iceServers prevents third-party leaks)
+    // Configure peer connection (empty iceServers for local, or STUN/TURN for remote)
     const pc = new RTCPeerConnection({
-      iceServers: [],
+      iceServers: options.iceServers || [],
     });
     this.pc = pc;
 
@@ -72,6 +75,7 @@ export class WebRtcStreamClient {
     });
 
     // Send authenticated SDP offer to agent signaling endpoint
+    const streamMode = options.mode || (options.iceServers && options.iceServers.length > 0 ? 'remote' : 'local');
     const response = await fetch(`${agentUrl}/api/stream/offer`, {
       method: 'POST',
       headers: {
@@ -83,6 +87,7 @@ export class WebRtcStreamClient {
         type: 'offer',
         fps: options.fps,
         resolution: options.resolution,
+        mode: streamMode,
       }),
       signal: AbortSignal.timeout(6000),
     });

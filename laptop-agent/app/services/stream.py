@@ -5,10 +5,12 @@ import time
 from typing import Optional, Tuple
 
 import av
-from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
+from aiortc import RTCConfiguration, RTCIceServer, RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
 from aiortc.mediastreams import MediaStreamError
 import mss
 from PIL import Image, ImageDraw
+
+from app.services.turn import TurnService
 
 logger = logging.getLogger("pocketdesk.stream")
 
@@ -189,10 +191,12 @@ class StreamManager:
         fps: int = 20,
         resolution: str = "720p",
         client_id: str = "PocketDesk Web Client",
+        mode: str = "local",
     ) -> dict:
         """
         Negotiate WebRTC connection with browser client using SDP offer/answer exchange.
         Terminates any previously existing session to support browser refreshes.
+        Configures STUN/TURN ICE servers when running in remote internet mode.
         """
         # Close any prior stale connection cleanly
         await cls.stop_stream()
@@ -201,8 +205,25 @@ class StreamManager:
         cls._resolution = resolution if resolution in RESOLUTION_MAP else "720p"
         cls._client_id = client_id
 
-        # Instantiate WebRTC PeerConnection
-        pc = RTCPeerConnection()
+        # Instantiate WebRTC PeerConnection (configured with STUN/TURN if remote mode)
+        if mode == "remote":
+            ice_config = TurnService.build_ice_server_config(client_id)
+            rtc_servers = []
+            for s in ice_config.get("ice_servers", []):
+                urls = s.get("urls", [])
+                if isinstance(urls, str):
+                    urls = [urls]
+                username = s.get("username")
+                credential = s.get("credential")
+                if username and credential:
+                    rtc_servers.append(RTCIceServer(urls=urls, username=username, credential=credential))
+                else:
+                    rtc_servers.append(RTCIceServer(urls=urls))
+            configuration = RTCConfiguration(iceServers=rtc_servers)
+            pc = RTCPeerConnection(configuration=configuration)
+        else:
+            pc = RTCPeerConnection()
+
         cls._active_pc = pc
 
         # Create capture track

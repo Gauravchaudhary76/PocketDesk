@@ -108,3 +108,22 @@ export interface InputStatus {
   screen_width: number;
   screen_height: number;
 }
+
+export type ConnectionMode = 'local' | 'remote';
+
+export interface PairedDeviceItem {
+  device_id: string;
+  device_name: string;
+  paired_at: string;
+  last_seen: string;
+  revoked: boolean;
+  role: string;
+  last_ip: string;
+}
+
+export interface IceServerConfig {
+  ice_servers: RTCIceServer[];
+  turn_configured: boolean;
+  nat_traversal_mode: string;
+  documentation: string;
+}

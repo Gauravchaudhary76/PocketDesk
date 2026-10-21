@@ -13,6 +13,10 @@ class StreamOfferRequest(BaseModel):
         default="720p",
         description="Target stream resolution ('1080p', '720p', '540p', '480p')"
     )
+    mode: Optional[Literal["local", "remote"]] = Field(
+        default="local",
+        description="Connection mode ('local' for LAN-only or 'remote' for Internet NAT traversal)"
+    )
 
 
 class StreamAnswerResponse(BaseModel):

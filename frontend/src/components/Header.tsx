@@ -1,18 +1,22 @@
 import React from 'react';
-import { Monitor, Smartphone, Shield } from 'lucide-react';
-import type { ConnectionStatus } from '../types';
+import { Monitor, Smartphone, Shield, Wifi, Globe, SmartphoneCharging } from 'lucide-react';
+import type { ConnectionStatus, ConnectionMode } from '../types';
 import { StatusBadge } from './StatusBadge';
 
 interface HeaderProps {
   status: ConnectionStatus;
+  connectionMode: ConnectionMode;
   onStatusChange: (newStatus: ConnectionStatus) => void;
   onOpenStageInfo: (stage: number, title: string, desc: string, details?: string[]) => void;
+  onOpenDevicesModal: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   status,
+  connectionMode,
   onStatusChange,
   onOpenStageInfo,
+  onOpenDevicesModal,
 }) => {
   return (
     <header className="sticky top-0 z-30 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/80 px-4 lg:px-8 py-3">
@@ -29,7 +33,20 @@ export const Header: React.FC<HeaderProps> = ({
                 PocketDesk
               </h1>
               <span className="text-[10px] uppercase font-semibold tracking-wider px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                v0.5.0 • Stage 5
+                v0.6.0 • Stage 6
+              </span>
+              <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800">
+                {connectionMode === 'remote' ? (
+                  <>
+                    <Globe className="w-3 h-3 text-cyan-400" />
+                    Remote NAT/TURN
+                  </>
+                ) : (
+                  <>
+                    <Wifi className="w-3 h-3 text-emerald-400" />
+                    Local Wi-Fi
+                  </>
+                )}
               </span>
             </div>
             <p className="text-xs text-slate-400 hidden sm:block">
@@ -38,12 +55,23 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Status and State Preview Bar */}
+        {/* Status and Action Buttons */}
         <div className="flex items-center gap-3">
           {/* Active status */}
           <StatusBadge status={status} />
 
-          {/* Interactive State Tester for testing requirement C */}
+          {/* Authorized Devices Trigger */}
+          <button
+            type="button"
+            onClick={onOpenDevicesModal}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium border border-slate-800 transition-colors cursor-pointer"
+            title="Manage Authorized Paired Devices"
+          >
+            <SmartphoneCharging className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Devices</span>
+          </button>
+
+          {/* Interactive State Tester for previewing states */}
           <div className="hidden md:flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1 text-xs">
             <span className="px-2 text-[11px] text-slate-400 font-medium">
               Preview State:
@@ -51,7 +79,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={() => onStatusChange('disconnected')}
-              className={`px-2 py-1 rounded text-xs transition-colors ${
+              className={`px-2 py-1 rounded text-xs transition-colors cursor-pointer ${
                 status === 'disconnected'
                   ? 'bg-slate-700/80 text-white font-semibold'
                   : 'text-slate-400 hover:text-slate-200'
@@ -63,7 +91,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={() => onStatusChange('connecting')}
-              className={`px-2 py-1 rounded text-xs transition-colors ${
+              className={`px-2 py-1 rounded text-xs transition-colors cursor-pointer ${
                 status === 'connecting'
                   ? 'bg-cyan-700/60 text-cyan-200 font-semibold'
                   : 'text-slate-400 hover:text-cyan-300'
@@ -75,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={() => onStatusChange('connected')}
-              className={`px-2 py-1 rounded text-xs transition-colors ${
+              className={`px-2 py-1 rounded text-xs transition-colors cursor-pointer ${
                 status === 'connected'
                   ? 'bg-emerald-800/80 text-emerald-200 font-semibold'
                   : 'text-slate-400 hover:text-emerald-300'
@@ -87,7 +115,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={() => onStatusChange('error')}
-              className={`px-2 py-1 rounded text-xs transition-colors ${
+              className={`px-2 py-1 rounded text-xs transition-colors cursor-pointer ${
                 status === 'error'
                   ? 'bg-rose-900/60 text-rose-200 font-semibold'
                   : 'text-slate-400 hover:text-rose-300'
@@ -103,20 +131,20 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             onClick={() =>
               onOpenStageInfo(
-                5,
+                6,
                 'PocketDesk Architecture & Stage Roadmap',
-                'PocketDesk is built incrementally following strict engineering rules. Stage 5 delivers authenticated remote mouse and keyboard control with touch gestures, on-screen keyboard, and emergency safety kill switch.',
+                'PocketDesk is built incrementally following strict engineering rules. Stage 6 introduces secure remote internet access via WebRTC DTLS-SRTP, dynamic STUN/TURN NAT traversal, persistent device pairing, and replay protection.',
                 [
                   'Stage 1: Frontend Prototype, UI Dashboard & Responsive Layout (Completed)',
                   'Stage 2: Python FastAPI Agent Foundation & Local Telemetry (Completed)',
                   'Stage 3: Local Network Device Pairing & Authenticated Handshake (Completed)',
                   'Stage 4: Authenticated WebRTC Desktop Video Streaming (Completed)',
-                  'Stage 5: Low-latency Input Dispatch (Mouse, Keyboard, Touch) (Current Stage)',
-                  'Stage 6: Encrypted WebRTC / NAT Traversal for Remote Internet Access',
+                  'Stage 5: Low-latency Input Dispatch (Mouse, Keyboard, Touch) (Completed)',
+                  'Stage 6: Encrypted WebRTC & Dynamic TURN Traversal for Remote Internet Access (Current Stage)',
                 ]
               )
             }
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition-colors cursor-pointer"
             title="View Roadmap & Stage Info"
             aria-label="View Project Roadmap"
           >

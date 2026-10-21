@@ -8,38 +8,44 @@ Development proceeds incrementally in stages, starting with a clean local protot
 
 ## Technology Stack
 
-### Frontend (Stages 1, 3, 4 & 5 — Current)
+### Frontend (Stages 1 through 6 — Current)
 - **Framework:** React 19 + TypeScript
 - **Build Tool:** Vite 8
 - **Styling:** Tailwind CSS v4
 - **Iconography:** Lucide React
-- **Screen Streaming (Stage 4):** Standard WebRTC `RTCPeerConnection` with empty `iceServers: []` (zero third-party relay leakage), HTML5 `<video>` viewport with native Fullscreen API support, and configurable resolution & FPS controls.
+- **Screen Streaming:** Standard WebRTC `RTCPeerConnection` with DTLS-SRTP encryption, HTML5 `<video>` viewport with native Fullscreen API support, and configurable resolution & FPS controls.
+- **NAT Traversal Client (Stage 6):** Dynamically acquires time-limited STUN/TURN credentials from the laptop agent; supports dual-mode connection ("Local Wi-Fi Mode" vs "Remote Internet Mode").
+- **Device Security & Management (Stage 6):**
+  - Persistent unique client device identification (`dev_...`) stored in `localStorage`.
+  - Single-use cryptographic nonces and client timestamps ($\pm 60$s) for replay protection.
+  - Dedicated **Authorized Devices Modal** to inspect all paired clients and execute instant revocation.
 - **Remote Input (Stage 5):**
   - Direct touch-to-screen cursor control with letterbox/pillarbox aspect-ratio compensation.
   - Dedicated virtual trackpad zone with sensitivity controls, tap-to-click, and drag lock.
   - On-screen virtual keyboard supporting special navigation keys (`Enter`, `Esc`, `Tab`, `Backspace`, arrows).
   - Native mobile text entry field with Unicode character batching.
-  - Low-latency bi-directional WebSocket client (`/api/input/ws`) with REST fallback.
   - Safety controls: Default-disabled input with explicit consent confirmation modal and persistent Emergency Stop button.
 
-### Laptop Agent (Stages 2, 3, 4 & 5 — Current)
+### Laptop Agent (Stages 2 through 6 — Current)
 - **Framework:** Python 3.10+ with FastAPI and Uvicorn
 - **Validation:** Pydantic v2 data models with strict input bounds
-- **Authentication:** Ephemeral 6-digit terminal PIN authorization with Bearer session tokens
+- **Authentication:** Ephemeral 6-digit terminal PIN authorization with Bearer session tokens (1-hour TTL)
+- **Remote NAT Traversal (Stage 6):** Dynamic RFC 5766 TURN ephemeral credentials (`TurnService`) with HMAC-SHA1 signature and STUN server discovery.
+- **Device Management & Replay Protection (Stage 6):**
+  - Persistent `DeviceRegistry` (`data/devices.json`) managing 256-bit cryptographic device secrets.
+  - `ReplayProtection` service validating timestamp windows ($\pm 60$s) and caching consumed nonces.
+  - `RateLimiter` sliding-window lockout enforcing a 5-minute lockout after 5 consecutive failed attempts.
+  - Zero-tolerance revocation: dropping a device instantly drops its active WebRTC stream and disables input.
 - **Desktop Capture (Stage 4):** Fast Windows desktop frame capture via `mss` with Pillow bilinear downscaling
-- **WebRTC Video Engine (Stage 4):** `aiortc` and PyAV (`av`) generating paced H.264 / VP8 video streams
+- **WebRTC Video Engine (Stage 4 & 6):** `aiortc` and PyAV (`av`) generating paced H.264 / VP8 video streams over DTLS-SRTP
 - **Win32 Input Injection (Stage 5):**
   - Native `ctypes.windll.user32` interface calling `SetCursorPos`, `mouse_event`, and `SendInput`.
   - Unicode character typing via `KEYEVENTF_UNICODE` (independent of host keyboard layout).
   - In-memory tracking of all held keys and mouse buttons with automatic emergency release upon disconnect.
   - Rate limiting (max 150 events/sec) and stale-packet discarding (> 1.5s).
 - **Hardware Telemetry:** `psutil` (OS, CPU load, RAM allocation, battery sensors)
-- **Testing:** `pytest` and `httpx` (28 passing automated tests)
-- **Network Scope:** Local private Wi-Fi network (RFC1918 subnets: `192.168.x.x`, `10.x.x.x`, `172.16-31.x.x`)
-
-### Future Stage (Stage 6)
-- **Encrypted Remote Access:** WebRTC NAT traversal (STUN/TURN), TLS certificates, and end-to-end encryption for out-of-LAN internet connectivity *(Stage 6)*
-- **Cost & Dependencies:** 100% free and open-source. Zero paid external APIs, zero third-party AI keys.
+- **Testing:** `pytest` and `httpx` (34 passing automated unit & integration tests)
+- **Network Scope:** Dual-mode: Local private Wi-Fi (LAN) or secure remote internet access via reverse proxy and TURN relay.
 
 ---
 
@@ -47,24 +53,26 @@ Development proceeds incrementally in stages, starting with a clean local protot
 
 ```
 pocketdesk/
-├── frontend/                 # React + Vite + TypeScript web dashboard (Stages 1, 3, 4 & 5)
+├── frontend/                 # React + Vite + TypeScript web dashboard (Stages 1 - 6)
 │   ├── src/
 │   │   ├── components/       # Reusable UI components
-│   │   │   ├── Header.tsx               # Branding, status, state preview switcher
-│   │   │   ├── DeviceCard.tsx           # Paired laptop info, address config & Connect button
-│   │   │   ├── ConnectModal.tsx         # Address configuration & 6-digit PIN pairing dialog
-│   │   │   ├── RemoteDisplay.tsx        # WebRTC video stream viewport, touch controls & Emergency Stop
-│   │   │   ├── VirtualKeyboard.tsx      # On-screen keyboard with special keys & shortcuts
-│   │   │   ├── MouseKeyboardSection.tsx # Virtual trackpad, tactile click buttons & hotkeys
-│   │   │   ├── FileTransferSection.tsx  # File drag & drop queue (disabled in Stage 5)
-│   │   │   ├── ApplicationsSection.tsx  # Quick launcher & task manager (disabled in Stage 5)
-│   │   │   ├── SystemMonitorSection.tsx # Live hardware telemetry & resource meters
-│   │   │   ├── StatusBadge.tsx          # Connection state indicator pill
-│   │   │   ├── StageBadge.tsx           # Roadmap milestone indicator
-│   │   │   └── InfoModal.tsx            # Stage notification dialog (Rule #6)
+│   │   │   ├── Header.tsx                 # Branding, status, mode badge & Devices modal trigger
+│   │   │   ├── DeviceCard.tsx             # Paired laptop info, address config & Connect button
+│   │   │   ├── ConnectModal.tsx           # Dual-mode (Local Wi-Fi vs Remote Internet) pairing dialog
+│   │   │   ├── DeviceManagementModal.tsx  # Stage 6 authorized paired devices & revocation manager
+│   │   │   ├── RemoteDisplay.tsx          # WebRTC video stream viewport, touch controls & Emergency Stop
+│   │   │   ├── VirtualKeyboard.tsx        # On-screen keyboard with special keys & shortcuts
+│   │   │   ├── MouseKeyboardSection.tsx   # Virtual trackpad, tactile click buttons & hotkeys
+│   │   │   ├── FileTransferSection.tsx    # File drag & drop queue (labeled future stage)
+│   │   │   ├── ApplicationsSection.tsx    # Quick launcher & task manager (labeled future stage)
+│   │   │   ├── SystemMonitorSection.tsx   # Live hardware telemetry & resource meters
+│   │   │   ├── StatusBadge.tsx            # Connection state indicator pill
+│   │   │   ├── StageBadge.tsx             # Roadmap milestone indicator
+│   │   │   └── InfoModal.tsx              # Stage notification dialog (Rule #6)
 │   │   ├── services/
-│   │   │   ├── webrtc.ts                # WebRTC RTCPeerConnection & signaling client
-│   │   │   └── input.ts                 # Input client, WebSocket dispatcher & coordinate mapping
+│   │   │   ├── remote.ts                  # Stage 6 remote client, secrets & replay nonces
+│   │   │   ├── webrtc.ts                  # WebRTC RTCPeerConnection & signaling client
+│   │   │   └── input.ts                   # Input client, WebSocket dispatcher & coordinate mapping
 │   │   ├── types/            # TypeScript interfaces & domain models
 │   │   ├── App.tsx           # Root layout, pairing workflow & input state manager
 │   │   ├── index.css         # Base styles and dark scrollbars
@@ -72,22 +80,24 @@ pocketdesk/
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── vite.config.ts
-├── laptop-agent/             # Python FastAPI Windows Desktop Agent (Stages 2, 3, 4 & 5)
+├── laptop-agent/             # Python FastAPI Windows Desktop Agent (Stages 2 - 6)
 │   ├── app/
-│   │   ├── models/           # Pydantic schemas (auth, health, system, capabilities, stream, input)
-│   │   ├── routers/          # FastAPI routes (/health, /api/pair, /api/system, /api/stream/*, /api/input/*)
-│   │   ├── services/         # Telemetry providers, PIN auth, WebRTC stream & Win32 InputService
+│   │   ├── models/           # Pydantic schemas (auth, health, system, stream, input, remote)
+│   │   ├── routers/          # FastAPI routes (/health, /api/pair, /api/stream/*, /api/input/*, /api/remote/*)
+│   │   ├── services/         # Telemetry, TurnService, DeviceRegistry, ReplayProtection, RateLimiter
 │   │   ├── dependencies/     # Bearer token validation dependencies
-│   │   ├── config.py         # App settings & LAN IP discovery
+│   │   ├── config.py         # App settings & environment discovery
 │   │   ├── logger.py         # Structured logging configuration
 │   │   └── main.py           # FastAPI entry & WebRTC/Input lifespan cleanup
-│   ├── tests/                # Automated pytest suite (28 unit/integration tests)
+│   ├── tests/                # Automated pytest suite (34 unit/integration tests)
 │   ├── run.py                # Agent CLI launcher with --lan support
 │   ├── requirements.txt      # Python dependencies
 │   └── README.md             # Virtual environment setup & usage guide
-├── docs/                     # Engineering architecture & roadmap
-│   ├── architecture.md
-│   └── roadmap.md
+├── docs/                     # Engineering architecture, deployment & security guides
+│   ├── architecture.md       # High-level component interactions & data flow
+│   ├── deployment_guide.md   # Production deployment options (Mesh overlay vs Reverse Proxy + Coturn)
+│   ├── security_checklist.md # Threat model, HTTPS warning, and verification procedures
+│   └── roadmap.md            # Multi-stage roadmap specifications
 └── README.md                 # Project overview & documentation
 ```
 
@@ -103,104 +113,55 @@ pocketdesk/
 
 ---
 
-## Step-by-Step Local Wi-Fi Testing Procedure (Stage 5)
+## Deployment & Remote Access (Stage 6)
 
-### Step 1: Ensure Devices Are on the Same Wi-Fi
-Connect your mobile phone and your Windows laptop to the same Wi-Fi router / SSID.
-
-### Step 2: Configure Windows Firewall Safely
-To permit incoming agent connections on port 8000 without disabling your firewall, run **PowerShell as Administrator**:
-
-```powershell
-New-NetFirewallRule -DisplayName "PocketDesk Agent (Port 8000)" -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow -Profile Private
-```
-
-### Step 3: Start the Python Laptop Agent
-In a PowerShell terminal:
-
-```powershell
-cd C:\Users\gaura\.gemini\antigravity\scratch\pocketdesk\laptop-agent
-.\.venv\Scripts\Activate.ps1
-python run.py --lan
-```
-
-The terminal will display your laptop's local IP and a unique 6-digit pairing PIN:
-```
-==================================================
-  PocketDesk Laptop Agent v0.5.0 (Stage 5)
-  Mode: Local Wi-Fi Network Access enabled
-  Listening on all interfaces: http://0.0.0.0:8000
-  Phone Connection URL: http://192.168.1.145:8000
---------------------------------------------------
-  >> PAIRING PIN: 839201 <<
-  Enter this 6-digit PIN on your phone to connect.
-==================================================
-```
-
-### Step 4: Start the Frontend Web Server
-In a second PowerShell terminal:
-
-```powershell
-cd C:\Users\gaura\.gemini\antigravity\scratch\pocketdesk\frontend
-npm run dev -- --host
-```
-
-Vite will display your phone's connection URL (e.g., `http://192.168.1.145:5173/`).
-
-### Step 5: Open on Phone and Pair
-1. On your phone's browser, navigate to the Vite network address (e.g. `http://192.168.1.145:5173`).
-2. Tap **"Pair with Laptop"**, verify the agent address matches (`http://192.168.1.145:8000`), enter the 6-digit PIN, and tap **"Authorize & Connect"**.
-
-### Step 6: Start Screen Sharing
-1. Tap **"Start Screen Sharing"** in the Screen tab.
-2. The live Windows desktop video appears in the viewport with a green `● LIVE` badge.
-3. Check your laptop terminal — it will print `[SCREEN SHARING ACTIVE]`.
-
-### Step 7: Enable Remote Input
-1. Tap the green **"Enable Input"** button in the banner, video toolbar, or Controls section.
-2. An authorization modal will prompt: *"Enable Remote Input Control? You are granting this device permission to move the mouse cursor, click, and type keystrokes."*
-3. Tap **"Authorize & Enable"**.
-4. The laptop terminal immediately outputs:
-   ```
-   ==============================================================
-   [INPUT CONTROL ENABLED] Client 'PocketDesk Web Client' authorized for mouse/keyboard!
-   Emergency Stop: POST http://127.0.0.1:8000/api/input/control
-   ==============================================================
-   ```
+For complete production deployment instructions, please review the dedicated documentation:
+- **Deployment Guide:** [`docs/deployment_guide.md`](docs/deployment_guide.md) (Details on Tailscale mesh VPN, Caddy/Nginx reverse proxies, Coturn TURN relay setup, and infrastructure costs).
+- **Security Checklist:** [`docs/security_checklist.md`](docs/security_checklist.md) (Threat model, "HTTPS is not enough" analysis, and manual verification steps).
 
 ---
 
-## Manual Test Checklist
+## Step-by-Step Testing Procedure
 
-- [ ] **Mouse Movement (Direct Touch):** Slide your finger across the streamed desktop video and verify the Windows mouse cursor follows your finger position accurately.
-- [ ] **Left-Click:** Tap anywhere on an icon or empty desktop area and verify an immediate left click occurs at that position.
-- [ ] **Right-Click:** Long-press (holding for > 350ms) or two-finger tap to verify a Windows context menu opens.
-- [ ] **Click-and-Drag:** Touch and hold for 150ms then drag across the screen to select multiple files or drag a window.
-- [ ] **Trackpad Mode:** Switch to the **Controls** tab and use the Virtual Trackpad surface to move the cursor relatively, use the physical **Left Click** and **Right Click** buttons, and test **Drag Lock**.
-- [ ] **Vertical Scrolling:** Tap the **Scroll Up** / **Scroll Down** buttons or use the mouse scroll gesture.
-- [ ] **Virtual Keyboard:** Tap the keyboard icon in the stream toolbar to expand the on-screen keyboard. Press keys like `Enter`, `Backspace`, `Esc`, `Tab`, and arrow keys.
-- [ ] **Text Typing:** Type a string in the text entry field (e.g., `"PocketDesk remote typing test!"`) and tap **Send Text** into Notepad or a text editor.
-- [ ] **Windows Shortcuts:** Tap `Win + D` to toggle show desktop, or `Win + E` to open File Explorer.
-- [ ] **Emergency Kill Switch:** Tap the red **"Disable Input"** button and verify that remote inputs are immediately ignored and that the terminal logs `[INPUT CONTROL DISABLED]`.
-- [ ] **Session Cleanup:** Tap **"Disconnect"** and verify that all remote input permissions and video tracks are cleanly terminated.
+### 1. Local Wi-Fi Testing Mode
+1. **Configure Firewall:**
+   ```powershell
+   New-NetFirewallRule -DisplayName "PocketDesk Agent (Port 8000)" -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow -Profile Private
+   ```
+2. **Start Laptop Agent:**
+   ```powershell
+   cd laptop-agent
+   .\.venv\Scripts\Activate.ps1
+   python run.py --lan
+   ```
+3. **Start Web Frontend:**
+   ```powershell
+   cd frontend
+   npm run dev -- --host
+   ```
+4. On your phone, open the frontend, select **"Local Wi-Fi Mode"**, enter the 6-digit PIN, and connect.
+
+### 2. Remote Internet Testing Mode (Stage 6)
+1. In the web client, click **Connect / Pair** and select the **"Remote Internet (Stage 6)"** tab.
+2. Enter the remote agent URL (e.g. `https://pocketdesk.yourdomain.com`).
+3. For new devices: Enter the 6-digit terminal PIN to register the device. A 256-bit secret is issued and saved locally.
+4. For returning devices: Click **"Connect Paired Device"** — the client authenticates instantly using its cryptographic secret and single-use replay nonces.
+5. Tap **"Devices"** in the top navigation bar to inspect authorized devices or revoke access immediately.
 
 ---
 
-## Automated Tests
+## Automated Test Verification
 
 Run the automated test suite in `laptop-agent/`:
-
 ```powershell
-cd C:\Users\gaura\.gemini\antigravity\scratch\pocketdesk\laptop-agent
+cd laptop-agent
 .\.venv\Scripts\pytest.exe -v
 ```
 
-All 28 unit and integration tests verify:
-- Coordinate mapping accuracy and screen boundary clamping
-- Input validation (rejection of out-of-bounds coordinates, unwhitelisted keys, oversized text payloads)
-- Authentication enforcement on all input endpoints (401 Unauthorized)
-- Permission gating (403 Forbidden when remote input is disabled)
-- Explicit input enable / disable / emergency stop lifecycle
-- Automatic key and mouse button release during cleanup
-- WebRTC SDP offer/answer signaling exchange (`/api/stream/offer`)
-- Pairing authorization & lockout protection
+Run the frontend TypeScript & Vite production build:
+```powershell
+cd frontend
+npm run build
+```
+
+Both test suites pass with **100% success** (34 Python tests + clean Vite build).

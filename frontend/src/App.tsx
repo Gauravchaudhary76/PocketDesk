@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import type { ConnectionStatus, DeviceInfo, SystemInfoResponse, ActiveTab, StreamResolution } from './types';
+import type {
+  ConnectionStatus,
+  DeviceInfo,
+  SystemInfoResponse,
+  ActiveTab,
+  StreamResolution,
+  ConnectionMode,
+} from './types';
 import { Header } from './components/Header';
 import { DeviceCard } from './components/DeviceCard';
 import { RemoteDisplay } from './components/RemoteDisplay';
@@ -8,9 +15,11 @@ import { FileTransferSection } from './components/FileTransferSection';
 import { ApplicationsSection } from './components/ApplicationsSection';
 import { SystemMonitorSection } from './components/SystemMonitorSection';
 import { ConnectModal } from './components/ConnectModal';
+import { DeviceManagementModal } from './components/DeviceManagementModal';
 import { InfoModal } from './components/InfoModal';
 import { streamClient } from './services/webrtc';
 import { inputClient } from './services/input';
+import { remoteClient } from './services/remote';
 import {
   Monitor,
   Mouse,
@@ -19,16 +28,20 @@ import {
   Activity,
   ChevronRight,
   Info,
-  Wifi,
+  Globe,
   Hand,
   ShieldCheck,
   ShieldAlert,
-  Power
+  Power,
+  SmartphoneCharging,
 } from 'lucide-react';
 
 export const App: React.FC = () => {
-  // Connection status
+  // Connection status & mode
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
+  const [connectionMode, setConnectionMode] = useState<ConnectionMode>(() => {
+    return (localStorage.getItem('pocketdesk_connection_mode') as ConnectionMode) || 'local';
+  });
 
   // Configurable Agent URL
   const [agentUrl, setAgentUrl] = useState<string>(() => {
@@ -52,7 +65,7 @@ export const App: React.FC = () => {
   // Active navigation tab (for mobile viewports)
   const [activeTab, setActiveTab] = useState<ActiveTab>('display');
 
-  // WebRTC Screen Streaming State (Stage 4)
+  // WebRTC Screen Streaming State (Stage 4 & Stage 6)
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isStartingStream, setIsStartingStream] = useState<boolean>(false);
   const [streamError, setStreamError] = useState<string | null>(null);
@@ -68,6 +81,7 @@ export const App: React.FC = () => {
 
   // Modals
   const [isConnectModalOpen, setIsConnectModalOpen] = useState<boolean>(false);
+  const [isDeviceModalOpen, setIsDeviceModalOpen] = useState<boolean>(false);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
@@ -78,7 +92,7 @@ export const App: React.FC = () => {
   }>({
     isOpen: false,
     title: '',
-    stageNumber: 5,
+    stageNumber: 6,
     description: '',
     details: [],
   });
@@ -136,13 +150,14 @@ export const App: React.FC = () => {
           setIsInputEnabled(false);
           inputClient.disableInput(url, token).catch(() => {});
           handleOpenInfo(
-            5,
+            6,
             'Session Expired or Revoked',
             'Your session token has expired or was revoked by the laptop agent. Remote input and screen streaming have been safely terminated.',
             [
-              'Local sessions are automatically invalidated upon agent restart',
-              'Tokens expire after 4 hours of inactivity',
-              'Re-authorize by entering the current 6-digit PIN'
+              'Remote session tokens automatically expire after 1 hour (configurable TTL)',
+              'Replay protection nonces are single-use within a 60-second window',
+              'Device revocation immediately invalidates all active sessions',
+              'Re-authenticate by connecting with your paired device secret or entering a new PIN',
             ]
           );
           return false;
@@ -231,12 +246,27 @@ export const App: React.FC = () => {
     setStreamError(null);
 
     try {
+      let iceServers: RTCIceServer[] = [];
+
+      // In Remote Mode, fetch dynamic STUN / TURN credentials from agent
+      if (connectionMode === 'remote') {
+        try {
+          const iceConfig = await remoteClient.getIceServers(agentUrl, sessionToken);
+          iceServers = iceConfig.ice_servers || [];
+        } catch (iceErr) {
+          console.warn('Could not fetch dynamic ICE servers, using fallback:', iceErr);
+          iceServers = [{ urls: 'stun:stun.cloudflare.com:3478' }];
+        }
+      }
+
       await streamClient.startStream(
         agentUrl,
         sessionToken,
         {
           fps: streamFps,
           resolution: streamResolution,
+          mode: connectionMode,
+          iceServers,
         },
         (remoteStream) => {
           if (videoRef.current) {
@@ -285,10 +315,8 @@ export const App: React.FC = () => {
   // Remote Input Controls (Stage 5)
   const handleToggleInput = (enable: boolean) => {
     if (enable) {
-      // Request explicit confirmation before enabling remote input
       setConfirmInputModalOpen(true);
     } else {
-      // Immediate emergency stop
       handleEmergencyDisableInput();
     }
   };
@@ -353,15 +381,15 @@ export const App: React.FC = () => {
     inputClient.sendShortcut(keys);
   };
 
-  // Initiate connection & pairing workflow
-  const handleConnectWithPin = async (
+  // Local Wi-Fi Connection Flow
+  const handleConnectLocal = async (
     targetUrl: string,
     pairingPin: string
   ): Promise<{ success: boolean; error?: string }> => {
     setIsConnecting(true);
 
     try {
-      // Step 1: Health probe to ensure agent is reachable
+      // Step 1: Health probe
       const healthRes = await fetch(`${targetUrl}/health`, {
         signal: AbortSignal.timeout(3500),
       }).catch(() => {
@@ -374,7 +402,7 @@ export const App: React.FC = () => {
         throw new Error(`Agent health check returned HTTP ${healthRes.status}`);
       }
 
-      // Step 2: Authorize with 6-digit PIN
+      // Step 2: Local pairing
       const pairRes = await fetch(`${targetUrl}/api/pair`, {
         method: 'POST',
         headers: {
@@ -382,7 +410,7 @@ export const App: React.FC = () => {
         },
         body: JSON.stringify({
           pairing_code: pairingPin,
-          client_name: 'PocketDesk Web Client',
+          client_name: 'PocketDesk Web Client (Local)',
         }),
         signal: AbortSignal.timeout(3500),
       }).catch(() => {
@@ -398,15 +426,17 @@ export const App: React.FC = () => {
       const pairData = await pairRes.json();
       const token = pairData.session_token;
 
-      // Save token securely (in memory and sessionStorage)
+      // Save token securely
       setSessionToken(token);
       sessionStorage.setItem('pocketdesk_session_token', token);
 
-      // Save valid URL
+      // Save configuration
       setAgentUrl(targetUrl);
       localStorage.setItem('pocketdesk_agent_url', targetUrl);
+      setConnectionMode('local');
+      localStorage.setItem('pocketdesk_connection_mode', 'local');
 
-      // Step 3: Fetch initial telemetry
+      // Fetch telemetry
       await fetchTelemetry(targetUrl, token);
 
       setConnectionStatus('connected');
@@ -420,6 +450,51 @@ export const App: React.FC = () => {
     }
   };
 
+  // Remote Internet Connection Flow (Stage 6)
+  const handleConnectRemote = async (
+    targetUrl: string,
+    deviceName: string,
+    pairingPin: string | null
+  ): Promise<{ success: boolean; error?: string }> => {
+    setIsConnecting(true);
+
+    try {
+      let token: string;
+
+      if (pairingPin !== null) {
+        // Pairing with 6-digit PIN
+        const result = await remoteClient.pairDevice(targetUrl, deviceName, pairingPin);
+        token = result.sessionToken;
+      } else {
+        // Authenticating existing paired device via stored cryptographic secret
+        const result = await remoteClient.createSession(targetUrl);
+        token = result.sessionToken;
+      }
+
+      // Save token securely
+      setSessionToken(token);
+      sessionStorage.setItem('pocketdesk_session_token', token);
+
+      // Save configuration
+      setAgentUrl(targetUrl);
+      localStorage.setItem('pocketdesk_agent_url', targetUrl);
+      setConnectionMode('remote');
+      localStorage.setItem('pocketdesk_connection_mode', 'remote');
+
+      // Fetch initial telemetry
+      await fetchTelemetry(targetUrl, token);
+
+      setConnectionStatus('connected');
+      setIsConnecting(false);
+      setIsConnectModalOpen(false);
+      return { success: true };
+    } catch (err: unknown) {
+      setIsConnecting(false);
+      const errMsg = err instanceof Error ? err.message : 'Unknown remote connection error';
+      return { success: false, error: errMsg };
+    }
+  };
+
   // Disconnect & revoke session
   const handleDisconnect = async () => {
     // Terminate input and stream
@@ -428,13 +503,13 @@ export const App: React.FC = () => {
 
     if (sessionToken && agentUrl) {
       try {
-        await fetch(`${agentUrl}/api/unpair`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${sessionToken}`,
-          },
-          signal: AbortSignal.timeout(2000),
-        }).catch(() => {});
+        if (connectionMode === 'local') {
+          await fetch(`${agentUrl}/api/unpair`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${sessionToken}` },
+            signal: AbortSignal.timeout(2000),
+          }).catch(() => {});
+        }
       } catch {
         // Ignore network error on unpair
       }
@@ -471,6 +546,7 @@ export const App: React.FC = () => {
       {/* Top Application Header */}
       <Header
         status={connectionStatus}
+        connectionMode={connectionMode}
         onStatusChange={(newStatus) => {
           if (newStatus === 'disconnected') {
             handleDisconnect();
@@ -479,25 +555,31 @@ export const App: React.FC = () => {
           }
         }}
         onOpenStageInfo={handleOpenInfo}
+        onOpenDevicesModal={() => setIsDeviceModalOpen(true)}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Stage 5 Scope Announcement Banner */}
+        {/* Stage 6 Scope Announcement Banner */}
         <div className="bg-gradient-to-r from-blue-950/60 via-slate-900/80 to-indigo-950/60 border border-blue-900/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
           <div className="flex items-start gap-3">
             <div className="p-2.5 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400 shrink-0 mt-0.5">
-              <Hand className="w-5 h-5" />
+              <Globe className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                  <Wifi className="w-4 h-4 text-emerald-400" />
-                  Stage 5: Remote Mouse & Keyboard Control
+                  <Globe className="w-4 h-4 text-cyan-400" />
+                  Stage 6: Secure Remote Access & WebRTC NAT Traversal
                 </h2>
-                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
                   Active Stage
                 </span>
+                {connectionMode === 'remote' && (
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                    INTERNET NAT/TURN
+                  </span>
+                )}
                 {isInputEnabled && (
                   <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
                     INPUT ACTIVE
@@ -505,66 +587,80 @@ export const App: React.FC = () => {
                 )}
               </div>
               <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
-                Interact with your Windows 10/11 laptop directly via touch gestures on the streamed display, virtual on-screen keyboard, or dedicated trackpad. Remote input requires explicit enablement and can be terminated instantly with the Emergency Stop button.
+                Connect to your Windows laptop across different networks and carrier-grade NATs. Powered by WebRTC with dynamic STUN/TURN relay credentials (RFC 5766), persistent device registration, cryptographic replay protection, and rate limiting.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
             {connectionStatus !== 'connected' && (
               <button
                 type="button"
                 onClick={() => setIsConnectModalOpen(true)}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20 transition-all cursor-pointer"
               >
-                <Wifi className="w-3.5 h-3.5" />
-                <span>Pair with Laptop</span>
+                <Globe className="w-3.5 h-3.5" />
+                <span>Connect / Pair</span>
               </button>
             )}
 
             {connectionStatus === 'connected' && (
-              isInputEnabled ? (
+              <>
                 <button
                   type="button"
-                  onClick={handleEmergencyDisableInput}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-900/40 transition-all cursor-pointer"
-                  title="Immediately disable remote input"
+                  onClick={() => setIsDeviceModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors cursor-pointer"
+                  title="Manage Authorized Paired Devices"
                 >
-                  <Power className="w-3.5 h-3.5" />
-                  <span>Disable Input</span>
+                  <SmartphoneCharging className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Devices</span>
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirmInputModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-900/40 transition-all cursor-pointer"
-                  title="Authorize remote touch and keyboard input"
-                >
-                  <Hand className="w-3.5 h-3.5" />
-                  <span>Enable Input</span>
-                </button>
-              )
+
+                {isInputEnabled ? (
+                  <button
+                    type="button"
+                    onClick={handleEmergencyDisableInput}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-900/40 transition-all cursor-pointer"
+                    title="Immediately disable remote input"
+                  >
+                    <Power className="w-3.5 h-3.5" />
+                    <span>Disable Input</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmInputModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-900/40 transition-all cursor-pointer"
+                    title="Authorize remote touch and keyboard input"
+                  >
+                    <Hand className="w-3.5 h-3.5" />
+                    <span>Enable Input</span>
+                  </button>
+                )}
+              </>
             )}
 
             <button
               type="button"
               onClick={() =>
                 handleOpenInfo(
-                  5,
-                  'Stage 5 Remote Input Architecture & Safety Model',
-                  'In Stage 5, PocketDesk enables touch gesture mapping and on-screen keyboard input to control Windows laptops over local Wi-Fi.',
+                  6,
+                  'Stage 6 Remote Access Architecture & Security Specifications',
+                  'In Stage 6, PocketDesk adds production-grade remote internet connectivity with zero unauthenticated endpoints exposed to the public.',
                   [
-                    'Explicit Authorization: Remote input is disabled by default and requires explicit user consent.',
-                    'Emergency Kill Switch: One-click button releases all held keys and mouse buttons immediately.',
-                    'Touch-to-Screen Mapping: Accounts for letterboxing/pillarboxing and normalizes coordinates [0.0, 1.0].',
-                    'Win32 SendInput: Dispatches native cursor moves, mouse clicks, wheel scrolls, and Unicode text entry.',
-                    'UIPI Limitation: Non-elevated processes cannot send synthetic input to Windows Secure Desktop (Ctrl+Alt+Del, UAC prompts).'
+                    'WebRTC DTLS-SRTP: End-to-end media encryption for desktop video streaming and binary data channels.',
+                    'Dynamic STUN / TURN Traversal: Generates time-limited RFC 5766 HMAC-SHA1 credentials for Coturn / Twilio relays.',
+                    'Persistent Device Registry: Pairing generates a cryptographically random 256-bit secret stored in localStorage.',
+                    'Cryptographic Replay Protection: Pairing and session requests require single-use nonces and valid timestamps (±60s).',
+                    'Sliding-Window Rate Limiting: 5 consecutive failed authentication attempts triggers a 5-minute client lockout.',
+                    'Zero-Tolerance Revocation: Revoking an authorized device drops its active sessions, screen stream, and input rights immediately.',
+                    'Host UIPI Boundaries: Agent runs as normal user by default; elevated UI (UAC / Ctrl+Alt+Del) remains guarded by Windows.',
                   ]
                 )
               }
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
             >
-              <span>Stage 5 Specs</span>
+              <span>Stage 6 Specs</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -736,7 +832,7 @@ export const App: React.FC = () => {
             <span>Mobile-to-Windows Remote Control System</span>
           </div>
           <div className="text-[11px] text-slate-400">
-            Stage 5 Remote Mouse & Keyboard Injection • Private Local Wi-Fi Network
+            Stage 6 Remote NAT Traversal • WebRTC DTLS-SRTP & TURN Relay
           </div>
         </div>
       </footer>
@@ -796,8 +892,21 @@ export const App: React.FC = () => {
         isOpen={isConnectModalOpen}
         onClose={() => setIsConnectModalOpen(false)}
         currentAddress={agentUrl}
-        onConnect={handleConnectWithPin}
+        currentMode={connectionMode}
+        onConnectLocal={handleConnectLocal}
+        onConnectRemote={handleConnectRemote}
         isConnecting={isConnecting}
+      />
+
+      {/* Authorized Paired Devices Modal */}
+      <DeviceManagementModal
+        isOpen={isDeviceModalOpen}
+        onClose={() => setIsDeviceModalOpen(false)}
+        agentUrl={agentUrl}
+        token={sessionToken}
+        onDeviceRevoked={() => {
+          handleDisconnect();
+        }}
       />
 
       {/* Explanatory Info Modal */}

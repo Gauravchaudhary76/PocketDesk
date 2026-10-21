@@ -22,6 +22,16 @@ from app.models.input import (
     ScreenInfoResponse,
     InputOperationResponse,
 )
+from app.models.remote import (
+    DevicePairRequest,
+    DevicePairResponse,
+    RemoteSessionRequest,
+    RemoteSessionResponse,
+    PairedDeviceItem,
+    DeviceListResponse,
+    DeviceRevokeResponse,
+    IceServerConfigResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -50,4 +60,12 @@ __all__ = [
     "InputStatusResponse",
     "ScreenInfoResponse",
     "InputOperationResponse",
+    "DevicePairRequest",
+    "DevicePairResponse",
+    "RemoteSessionRequest",
+    "RemoteSessionResponse",
+    "PairedDeviceItem",
+    "DeviceListResponse",
+    "DeviceRevokeResponse",
+    "IceServerConfigResponse",
 ]

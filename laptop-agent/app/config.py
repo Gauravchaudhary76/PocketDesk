@@ -10,8 +10,19 @@ class Settings:
     """Application configuration for PocketDesk Laptop Agent."""
 
     APP_NAME: str = "PocketDesk Laptop Agent"
-    APP_VERSION: str = "0.5.0"
-    STAGE: int = 5
+    APP_VERSION: str = "0.6.0"
+    STAGE: int = 6
+
+    # Storage Directory for Persistent Authorized Devices
+    STORAGE_DIR: str = os.getenv("POCKETDESK_STORAGE_DIR", "storage")
+
+    # Session Lifetime
+    SESSION_TTL_SECONDS: int = int(os.getenv("POCKETDESK_SESSION_TTL_SECONDS", "3600"))
+
+    # WebRTC NAT Traversal & Relay Configuration (NEVER hardcoded in source)
+    TURN_URL: str = os.getenv("POCKETDESK_TURN_URL", "")
+    TURN_SECRET: str = os.getenv("POCKETDESK_TURN_SECRET", "")
+    STUN_URL: str = os.getenv("POCKETDESK_STUN_URL", "stun:stun.cloudflare.com:3478,stun:stun.l.google.com:19302")
 
     # Binding Configuration (Default: 127.0.0.1; use 0.0.0.0 or --lan for Wi-Fi access)
     HOST: str = os.getenv("POCKETDESK_HOST", "127.0.0.1")

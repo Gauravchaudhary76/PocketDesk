@@ -30,6 +30,7 @@ async def start_stream(
             fps=request.fps,
             resolution=request.resolution,
             client_id="PocketDesk Web Client",
+            mode=request.mode or "local",
         )
         return StreamAnswerResponse(**answer_data)
     except Exception as exc:
