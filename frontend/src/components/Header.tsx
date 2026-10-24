@@ -33,7 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
                 PocketDesk
               </h1>
               <span className="text-[10px] uppercase font-semibold tracking-wider px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                v0.8.0 • Stage 8
+                v1.0.0
               </span>
               <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800">
                 {connectionMode === 'remote' ? (

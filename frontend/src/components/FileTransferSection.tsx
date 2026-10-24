@@ -259,7 +259,7 @@ export const FileTransferSection: React.FC<FileTransferSectionProps> = ({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <StageBadge stage={7} label="Stage 7 Feature" variant="filled" />
+          <StageBadge stage={7} label="Sandboxed Storage" variant="filled" />
           <button
             type="button"
             onClick={() =>

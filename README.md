@@ -1,84 +1,124 @@
 # PocketDesk
 
-PocketDesk is a modern, privacy-focused remote access system designed to let you securely view and control your Windows 10/11 laptop directly from your phone through a mobile-friendly web application.
+<div align="center">
 
-Development proceeds incrementally in stages, starting with a clean local prototype and gradually introducing authenticated local network pairing, high-performance WebRTC screen capture, low-latency input controls, encrypted NAT traversal, and safe restricted file and application management.
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688.svg)
+![React](https://img.shields.io/badge/React-19-61DAFB.svg)
+![React Native](https://img.shields.io/badge/React_Native-0.76-61DAFB.svg)
+![WebRTC](https://img.shields.io/badge/WebRTC-P2P%20Streaming-333333.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue.svg)
+
+**A secure, low-latency remote access platform designed to view, control, and manage Windows 10/11 laptops directly from a smartphone or web client.**
+
+[Features](#key-features) • [Architecture](#architecture) • [Security Model](#security-model) • [Getting Started](#getting-started) • [Testing](#automated-tests) • [Author](#author)
+
+</div>
 
 ---
 
-## Technology Stack
+## Overview
 
-### Frontend (Stages 1 through 8 — Current)
-- **Framework:** React 19 + TypeScript
-- **Build Tool:** Vite 8
-- **Styling:** Tailwind CSS v4
-- **Iconography:** Lucide React
-- **AI-Assisted Command Interface (Stage 8):**
-  - Natural-language instruction input bar with suggestion chips.
-  - Two-stage confirmation workflow: proposed action card with intent, parameters, and risk level badges before execution.
-  - Zero paid API requirement: utilizes deterministic, rule-based intent parsing on the agent.
-  - Rich action result displays: base64 screenshot preview modal, telemetry cards, file search lists, app launch indicators, and command help catalogs.
-- **Screen Streaming:** Standard WebRTC `RTCPeerConnection` with DTLS-SRTP encryption, HTML5 `<video>` viewport with native Fullscreen API support, and configurable resolution & FPS controls.
-- **Restricted File Manager (Stage 7):**
-  - Interactive approved directory browser (Downloads, Documents, Desktop, Pictures) with breadcrumbs.
-  - Direct file download to mobile browser.
-  - Chunked upload dropzone with real-time percentage progress bar and 50 MB limit enforcement.
-  - Folder creation modal with Windows naming validation.
-- **Application Launcher (Stage 7):**
-  - Allowlist-restricted application grid (Notepad, Calculator, Paint, File Explorer, Microsoft Edge, VS Code, Task Manager, Terminal).
-  - Explicit confirmation modal for potentially disruptive tools (Task Manager, PowerShell/Terminal).
-  - Live feedback toast with host Process ID (PID).
-- **Remote NAT Traversal (Stage 6):** Dynamically acquires time-limited STUN/TURN credentials from the laptop agent; supports dual-mode connection ("Local Wi-Fi Mode" vs "Remote Internet Mode").
-- **Device Security & Management (Stage 6):**
-  - Persistent unique client device identification (`dev_...`) stored in `localStorage`.
-  - Single-use cryptographic nonces and client timestamps ($\pm 60$s) for replay protection.
-  - Dedicated **Authorized Devices Modal** to inspect all paired clients and execute instant revocation.
-- **Remote Input (Stage 5):**
-  - Direct touch-to-screen cursor control with letterbox/pillarbox aspect-ratio compensation.
-  - Dedicated virtual trackpad zone with sensitivity controls, tap-to-click, and drag lock.
-  - On-screen virtual keyboard supporting special navigation keys (`Enter`, `Esc`, `Tab`, `Backspace`, arrows).
-  - Safety controls: Default-disabled input with explicit consent confirmation modal and persistent Emergency Stop button.
+PocketDesk turns any authenticated phone or browser into a portable terminal for your personal Windows workstation. Engineered with a defense-in-depth security model, it delivers real-time desktop screen sharing over encrypted WebRTC peer connections, synthetic trackpad and keystroke injection via native Win32 APIs, a sandboxed file manager, allowlisted application execution, and a local rule-based desktop assistant.
 
-### Android Application (Stage 9 — Current)
-- **Framework:** Dedicated React Native + TypeScript application (`android-app/`).
-- **WebRTC Transport:** Android native `react-native-webrtc` binding with hardware-accelerated H.264/VP8 video decoding.
-- **Security & Storage:** Hardware-backed `EncryptedSharedPreferences` / Android KeyStore for 256-bit device secrets (`SecureStorageService`). Memory-isolated short-lived session tokens (1-hour TTL).
-- **App Lifecycle & Backgrounding:** Android `AppState` event handling that automatically pauses video streams, suspends polling, and emergency-stops active inputs upon app backgrounding.
-- **Permissions:** Strictly minimal Android permissions (`INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`). Zero camera/mic and zero broad storage permissions.
-- **Features:** Registered laptop profile manager, WebRTC screen streaming, touch gesture mouse mapping, on-screen keyboard with Windows hotkeys, restricted file manager, allowlisted app launcher, hardware telemetry, and AI command interface.
+Whether you are connected to the same local Wi-Fi or working remotely across different networks via NAT traversal, PocketDesk provides smooth, responsive desktop control without exposing unauthenticated desktop ports to the internet.
 
-### Laptop Agent (Stages 2 through 8 — Current)
-- **Framework:** Python 3.10+ with FastAPI, Uvicorn, and `python-multipart`
-- **Validation:** Pydantic v2 data models with strict input bounds
-- **Authentication:** Ephemeral 6-digit terminal PIN authorization with Bearer session tokens (1-hour TTL)
-- **AI-Assisted Desktop Command Interface (Stage 8):**
-  - Deterministic rule-based intent parser mapping natural-language instructions to 6 authorized actions.
-  - Zero external paid AI APIs, zero external network queries, and zero shell execution.
-  - Prohibited pattern filter rejecting destructive strings (`rm`, `del`, `format`, `shutdown`, `reboot`, `powershell`, `cmd`, `drop`, `curl`).
-  - Mandatory confirmation gates for desktop screenshot captures and disruptive applications.
-  - Traceable security audit logging on every command parse and execute event.
-- **Restricted File Service (Stage 7):**
-  - Canonical path resolution (`Path.resolve()`) strictly confined to approved roots (`POCKETDESK_ALLOWED_ROOTS`).
-  - Path traversal and symlink escape defenses (rejects `../`, absolute paths, null bytes).
-  - Blacklist filtering of sensitive files, browser profiles, and credentials (`.ssh`, `.env`, `AppData`, `id_rsa`).
-  - 50 MB upload limit with automated partial-file cleanup on limit violation.
-- **Allowlisted Application Launcher (Stage 7):**
-  - Predefined mapping of immutable application IDs to fixed host executable paths.
-  - Zero arbitrary shell execution: processes spawned via `subprocess.Popen(..., shell=False)`.
-  - Confirmation requirement for disruptive tools.
-- **Remote NAT Traversal (Stage 6):** Dynamic RFC 5766 TURN ephemeral credentials (`TurnService`) with HMAC-SHA1 signature and STUN server discovery.
-- **Device Management & Replay Protection (Stage 6):**
-  - Persistent `DeviceRegistry` (`data/devices.json`) managing 256-bit cryptographic device secrets.
-  - `ReplayProtection` service validating timestamp windows ($\pm 60$s) and caching consumed nonces.
-  - `RateLimiter` sliding-window lockout enforcing a 5-minute lockout after 5 consecutive failed attempts.
-- **Desktop Capture (Stage 4):** Fast Windows desktop frame capture via `mss` with Pillow bilinear downscaling
-- **WebRTC Video Engine (Stage 4 & 6):** `aiortc` and PyAV (`av`) generating paced H.264 / VP8 video streams over DTLS-SRTP
-- **Win32 Input Injection (Stage 5):**
-  - Native `ctypes.windll.user32` interface calling `SetCursorPos`, `mouse_event`, and `SendInput`.
-  - Unicode character typing via `KEYEVENTF_UNICODE` (independent of host keyboard layout).
-  - In-memory tracking of all held keys and mouse buttons with automatic emergency release upon disconnect.
-- **Hardware Telemetry:** `psutil` (OS, CPU load, RAM allocation, battery sensors)
-- **Testing:** `pytest` and `httpx` (66 passing automated unit & integration tests)
+---
+
+## Key Features
+
+### 1. High-Performance Screen Streaming
+- **WebRTC Pipeline:** Low-latency video streaming using `aiortc` and PyAV with H.264 / VP8 encoding over DTLS-SRTP.
+- **Interactive Desktop Capture:** Resilient Win32 desktop station targeting (`WinSta0\Default`) with `mss` and `PIL.ImageGrab` fallback capture.
+- **Configurable Viewport:** Dynamic frame pacing and resolution scaling (1080p native, 720p HD, 540p, 480p at 15–60 FPS).
+- **Mobile-Optimized Player:** Responsive 16:9 viewport with fullscreen touch controls and letterbox/pillarbox compensation.
+
+### 2. Remote Mouse & Keyboard Control
+- **Touch Gesture Mapping:** Absolute cursor navigation, virtual trackpad gestures, two-finger scrolling, and double-click actions.
+- **Win32 Input Injection:** High-precision input dispatching using `ctypes` calling `SetCursorPos`, `mouse_event`, and `SendInput`.
+- **Full Unicode Keyboard:** International character typing using `KEYEVENTF_UNICODE` alongside standard Windows hotkeys (`Ctrl+C`, `Ctrl+V`, `Win`, `Alt`, `Tab`, `Esc`).
+- **Emergency Safety Cutoff:** Immediate server-side release of all held keys and mouse buttons with a single-click emergency stop button.
+
+### 3. Sandboxed File Manager
+- **Approved Root Enforcement:** Restricts file operations strictly to user-designated directories (Downloads, Documents, Desktop, Pictures).
+- **Path Traversal Defenses:** Canonical path resolution (`Path.resolve()`) preventing symlink escapes, relative dot-dot traversals, and null-byte injection.
+- **Sensitive Path Blacklist:** Blocks access to credentials, browser profiles, SSH keys (`.ssh`), environment files (`.env`), and system roots (`AppData`, `System32`).
+- **Upload & Download:** Streamlined chunked file uploads with real-time progress indicators and a strict 50 MB file size limit.
+
+### 4. Allowlisted Application Launcher
+- **Predefined Executables:** Strict allowlist (Notepad, Calculator, Paint, File Explorer, Microsoft Edge, VS Code, Task Manager, PowerShell).
+- **Zero Arbitrary Execution:** Executed via `subprocess.Popen(..., shell=False)` with explicit desktop handles—rejects command-line injection and arbitrary binaries.
+- **Disruptive Action Confirmation:** Requires explicit confirmation prompts before launching sensitive administrative or system inspection tools.
+
+### 5. Local AI Command Interface
+- **Rule-Based Natural Language Engine:** Maps natural-language prompts to verified desktop actions (launch app, hardware telemetry, file search, screenshot capture).
+- **Zero External Paid APIs:** Completely local and deterministic—no cloud dependencies, zero external network queries, and no API keys required.
+- **Execution Confirmation Gates:** Moderate and sensitive actions require explicit confirmation cards before triggering host actions.
+- **Prohibited String Filter:** Hard rejection of destructive shell tokens (`rm`, `del`, `format`, `shutdown`, `reboot`, `drop`, `kill`).
+
+### 6. Dual-Mode Network Architecture & NAT Traversal
+- **Local Wi-Fi Mode:** Zero-configuration direct P2P transport on home and office LANs.
+- **Remote Internet Mode:** RFC 5766 dynamic STUN / authenticated TURN relay integration with short-lived HMAC-SHA1 credentials for carrier-grade NAT traversal.
+- **Replay Protection:** Timestamp-bound verification windows ($\pm 60$s) and single-use cryptographic nonces.
+
+### 7. Dedicated Android Application
+- **Native Android Client:** Built with React Native and native `react-native-webrtc` bindings.
+- **Hardware-Backed Storage:** 256-bit device secrets protected with `EncryptedSharedPreferences` / Android KeyStore.
+- **Lifecycle Integration:** Automatically suspends video decoding, pauses polling, and releases inputs when backgrounded.
+
+---
+
+## Architecture
+
+```
+┌────────────────────────────────────────────────────────┐
+│                   PocketDesk Clients                   │
+│                                                        │
+│   ┌────────────────────────┐  ┌────────────────────┐   │
+│   │ React Web Client       │  │ Dedicated Android  │   │
+│   │ (Vite + TypeScript)    │  │ (React Native)     │   │
+│   └───────────┬────────────┘  └─────────┬──────────┘   │
+└───────────────┼─────────────────────────┼──────────────┘
+                │                         │
+                ▼                         ▼
+   HTTPS / WSS Signaling          Authenticated WebSockets
+   (Ephemeral PIN & JWT)          (Input Dispatch & Telemetry)
+                │                         │
+                └───────────┬─────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│             Windows Laptop Agent (FastAPI)             │
+│                                                        │
+│  ┌──────────────────┐  ┌────────────────────────────┐  │
+│  │ AuthService      │  │ Win32 Desktop Attachment   │  │
+│  │ (PIN & Sessions) │  │ ('WinSta0\\Default')        │  │
+│  └────────┬─────────┘  └─────────────┬──────────────┘  │
+│           │                          │                 │
+│  ┌────────▼─────────┐  ┌─────────────▼──────────────┐  │
+│  │ WebRTC Engine    │  │ Win32 Input Injection      │  │
+│  │ (aiortc + av)    │  │ (SendInput / SetCursorPos) │  │
+│  └────────┬─────────┘  └─────────────┬──────────────┘  │
+│           │                          │                 │
+│  ┌────────▼─────────┐  ┌─────────────▼──────────────┐  │
+│  │ Sandboxed FS     │  │ Allowlisted App Launcher   │  │
+│  │ (Path.resolve)   │  │ (subprocess / shell=False) │  │
+│  └──────────────────┘  └────────────────────────────┘  │
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Security Model
+
+PocketDesk enforces defense-in-depth at every layer:
+
+1. **Explicit Terminal Pairing:** To register a client, a 6-digit cryptographic PIN generated in the laptop host console must be entered manually.
+2. **Short-Lived Ephemeral Sessions:** Control actions require signed Bearer tokens with strict 1-hour expiration limits.
+3. **Replay & Rate Limiting:** All authentication and control payloads validate single-use nonces and client timestamps within a 60-second window, backed by sliding-window lockout rate limiting.
+4. **Sandboxed Filesystem:** Access is confined to whitelisted user directories; paths are canonicalized and tested against jailbreak vectors before reading or writing.
+5. **No Arbitrary Shell Execution:** The command interpreter maps strictly to predefined Python functions—no shell evaluation (`eval`, `exec`, or `cmd.exe`) is ever invoked.
 
 ---
 
@@ -86,156 +126,128 @@ Development proceeds incrementally in stages, starting with a clean local protot
 
 ```
 pocketdesk/
-├── android-app/              # Dedicated Android React Native Application (Stage 9)
-│   ├── android/              # Native Android configuration (Gradle, Manifest, Kotlin)
-│   │   ├── app/src/main/     # AndroidManifest.xml, MainActivity.kt, MainApplication.kt
-│   │   └── build.gradle      # Native dependencies (libwebrtc, security-crypto)
-│   ├── src/
-│   │   ├── components/       # Header.tsx (Android status, mode & emergency stop)
-│   │   ├── screens/          # ConnectScreen, RemoteDesktopScreen, FilesScreen, AppsScreen, SystemScreen, AssistantScreen
-│   │   ├── services/         # secureStorage, auth, webrtc, input, files, apps, assistant
-│   │   ├── types/            # TypeScript domain models
-│   │   └── App.tsx           # Android root application component & AppState listener
-│   ├── tests/                # Automated unit tests (12 tests)
-│   ├── package.json
-│   └── tsconfig.json
-├── frontend/                 # React + Vite + TypeScript web dashboard (Stages 1 - 8)
-│   ├── src/
-│   │   ├── components/       # Reusable UI components
-│   │   │   ├── Header.tsx                 # Branding, status, mode badge & Devices modal trigger
-│   │   │   ├── DeviceCard.tsx             # Paired laptop info, address config & Connect button
-│   │   │   ├── ConnectModal.tsx           # Dual-mode (Local Wi-Fi vs Remote Internet) pairing dialog
-│   │   │   ├── DeviceManagementModal.tsx  # Stage 6 authorized paired devices & revocation manager
-│   │   │   ├── RemoteDisplay.tsx          # WebRTC video stream viewport, touch controls & Emergency Stop
-│   │   │   ├── VirtualKeyboard.tsx        # On-screen keyboard with special keys & shortcuts
-│   │   │   ├── MouseKeyboardSection.tsx   # Virtual trackpad, tactile click buttons & hotkeys
-│   │   │   ├── AssistantSection.tsx       # Stage 8 AI command interface with confirmation gates
-│   │   │   ├── FileTransferSection.tsx    # Stage 7 restricted file manager & uploader
-│   │   │   ├── ApplicationsSection.tsx    # Stage 7 allowlisted application launcher
-│   │   │   ├── SystemMonitorSection.tsx   # Live hardware telemetry & resource meters
-│   │   │   ├── StatusBadge.tsx            # Connection state indicator pill
-│   │   │   ├── StageBadge.tsx             # Roadmap milestone indicator
-│   │   │   └── InfoModal.tsx              # Stage notification dialog
-│   │   ├── services/
-│   │   │   ├── assistant.ts               # Stage 8 AI assistant client (intents, parse, execute)
-│   │   │   ├── files.ts                   # Stage 7 file operations & upload tracking
-│   │   │   ├── apps.ts                    # Stage 7 application launcher client
-│   │   │   ├── remote.ts                  # Stage 6 remote client, secrets & replay nonces
-│   │   │   ├── webrtc.ts                  # WebRTC RTCPeerConnection & signaling client
-│   │   │   └── input.ts                   # Input client, WebSocket dispatcher & coordinate mapping
-│   │   ├── types/            # TypeScript interfaces & domain models
-│   │   ├── App.tsx           # Root layout, pairing workflow & input state manager
-│   │   ├── index.css         # Base styles and dark scrollbars
-│   │   └── main.tsx          # Entrypoint
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── vite.config.ts
-├── laptop-agent/             # Python FastAPI Windows Desktop Agent (Stages 2 - 8)
+├── laptop-agent/             # Python FastAPI Windows Desktop Agent
 │   ├── app/
-│   │   ├── models/           # Pydantic schemas (auth, health, system, stream, input, remote, files, apps, assistant)
-│   │   ├── routers/          # FastAPI routes (/health, /api/pair, /api/stream/*, /api/input/*, /api/remote/*, /api/files/*, /api/apps/*, /api/assistant/*)
-│   │   ├── services/         # Telemetry, TurnService, DeviceRegistry, ReplayProtection, FileManager, AppLauncher, AssistantService
-│   │   ├── dependencies/     # Bearer token validation dependencies
-│   │   ├── config.py         # App settings & environment discovery
-│   │   ├── logger.py         # Structured logging configuration
-│   │   └── main.py           # FastAPI entry & WebRTC/Input lifespan cleanup
-│   ├── tests/                # Automated pytest suite (66 unit/integration tests)
-│   ├── run.py                # Agent CLI launcher with --lan support
-│   ├── requirements.txt      # Python dependencies
-│   └── README.md             # Virtual environment setup & usage guide
-├── docs/                     # Engineering architecture, deployment & security guides
-│   ├── architecture.md       # High-level component interactions & data flow
-│   ├── android_application_guide.md # Stage 9 Android architecture, KeyStore security & build guide
-│   ├── deployment_guide.md   # Production deployment options (Mesh overlay vs Reverse Proxy + Coturn)
-│   ├── security_checklist.md # Threat model, HTTPS warning, and verification procedures
-│   ├── ai_command_interface.md # Stage 8 AI command interface, rule parser & confirmation gates
-│   ├── file_management_and_app_launcher.md # Stage 7 file security & application allowlist specifications
-│   └── roadmap.md            # Multi-stage roadmap specifications
-└── README.md                 # Project overview & documentation
+│   │   ├── models/           # Pydantic schemas (auth, stream, input, files, apps, assistant)
+│   │   ├── routers/          # REST & WebSocket endpoints (/health, /api/pair, /api/stream/*, /api/input/*)
+│   │   ├── services/         # Win32 desktop, WebRTC, input injection, file sandboxing, app launcher
+│   │   ├── dependencies/     # Session authentication & authorization guards
+│   │   ├── config.py         # System settings & environment validation
+│   │   ├── logger.py         # Structured security audit logging
+│   │   └── main.py           # FastAPI application entry & lifecycle hooks
+│   ├── tests/                # Automated pytest suite (66 unit & integration tests)
+│   ├── run.py                # Command-line agent runner (--lan flag)
+│   └── requirements.txt      # Python dependencies
+│
+├── frontend/                 # React 19 + TypeScript Web Dashboard
+│   ├── src/
+│   │   ├── components/       # RemoteDisplay, Header, Trackpad, Files, Apps, Assistant
+│   │   ├── services/         # WebRTC client, input WebSocket dispatcher, REST clients
+│   │   ├── types/            # TypeScript domain interfaces
+│   │   └── App.tsx           # Main application coordinator
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── android-app/              # React Native Android Mobile Application
+│   ├── android/              # Native Gradle & manifest configuration
+│   ├── src/
+│   │   ├── screens/          # ConnectScreen, RemoteDesktopScreen, FilesScreen, AppsScreen
+│   │   ├── services/         # SecureStorage (KeyStore), WebRTC, API client
+│   │   └── App.tsx           # Android root application component
+│   ├── tests/                # Node.js automated test suite (12 tests)
+│   └── package.json
+│
+├── docs/                     # Technical Architecture & Deployment Documentation
+│   ├── architecture.md       # Full architectural overview and data flow
+│   ├── deployment_guide.md   # Production deployment (Reverse Proxy + Coturn TURN)
+│   ├── security_checklist.md # Verification checklist and threat analysis
+│   ├── ai_command_interface.md # Rule-based assistant specification
+│   └── android_application_guide.md # Android build and KeyStore guide
+│
+└── README.md
 ```
 
 ---
 
-## Operating System Limitations (Windows UIPI / UAC)
+## Getting Started
 
-> [!IMPORTANT]
-> **Windows User Interface Privilege Isolation (UIPI) & Secure Desktop Restrictions:**
-> 1. **Elevated Windows:** If a window on the Windows laptop is running as Administrator (elevated), Windows kernel security blocks non-elevated applications from sending synthetic input to it.
-> 2. **Secure Desktop (UAC & Ctrl+Alt+Del):** When a User Account Control prompt appears ("Do you want to allow this app to make changes...") or when the Windows Lock/Login screen is active, Windows shifts to the isolated Secure Desktop. Standard non-elevated user processes cannot inject keystrokes or mouse clicks into this screen.
-> 3. **Remediation:** To control elevated windows remotely, start the laptop agent by opening PowerShell with **"Run as Administrator"**.
+### Prerequisites
+- **Operating System:** Windows 10 or Windows 11 (Host Agent)
+- **Python:** Python 3.10 or higher
+- **Node.js:** Node.js 18+ and npm
 
----
+### 1. Start the Windows Laptop Agent
+```powershell
+# Navigate to the agent directory
+cd laptop-agent
 
-## Documentation
+# Create and activate virtual environment
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 
-- **Android Application Guide (Stage 9):** [`docs/android_application_guide.md`](docs/android_application_guide.md)
-- **AI Desktop Interface (Stage 8):** [`docs/ai_command_interface.md`](docs/ai_command_interface.md)
-- **File Manager & App Launcher (Stage 7):** [`docs/file_management_and_app_launcher.md`](docs/file_management_and_app_launcher.md)
-- **Deployment Guide:** [`docs/deployment_guide.md`](docs/deployment_guide.md)
-- **Security Checklist:** [`docs/security_checklist.md`](docs/security_checklist.md)
+# Install dependencies
+pip install -r requirements.txt
 
----
+# Start agent on local network
+python run.py --lan
+```
+*Note the 6-digit **Pairing PIN** printed in your console.*
 
-## Step-by-Step Testing Procedure
+### 2. Start the Web Client
+```powershell
+# Navigate to the frontend directory
+cd frontend
 
-### 1. Local Wi-Fi Testing Mode
-1. **Configure Firewall:**
-   ```powershell
-   New-NetFirewallRule -DisplayName "PocketDesk Agent (Port 8000)" -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow -Profile Private
-   ```
-2. **Start Laptop Agent:**
-   ```powershell
-   cd laptop-agent
-   .\.venv\Scripts\Activate.ps1
-   python run.py --lan
-   ```
-3. **Start Web Frontend (or launch Android app):**
-   ```powershell
-   cd frontend
-   npm run dev -- --host
-   ```
-4. On your phone (via browser or dedicated Android app), select **"Local Wi-Fi Mode"**, enter the 6-digit PIN, and connect.
+# Install dependencies
+npm install
 
-### 2. Testing Stage 9 Features (Dedicated Android App)
-1. **Registered Laptops:**
-   - In `android-app`, open the **Connect** tab.
-   - Pair with your laptop using the terminal PIN.
-   - Verify that your laptop profile appears in the **Registered Laptops** list.
-   - Switch between saved laptops or remove a profile.
-2. **Remote Desktop & Touch Gestures:**
-   - Go to the **Screen** tab and tap **Start Stream**.
-   - Tap **Enable Input** and confirm the authorization prompt.
-   - Tap to click, double tap to double click, and drag to move the Windows cursor.
-   - Tap **Disable Input** or the top red **STOP INPUT** button to verify immediate emergency input cessation.
-3. **Files, Apps, System & AI Command Interface:**
-   - Browse approved files in the **Files** tab.
-   - Launch Notepad or Calculator in the **Apps** tab.
-   - Inspect live CPU, RAM, and battery metrics in the **System** tab.
-   - Submit natural language instructions in the **AI** tab (e.g. `"take screenshot"`, `"battery status"`).
-4. **App Backgrounding Lifecycle:**
-   - Background the app (or switch to another app).
-   - Verify that streaming pauses, remote input is disabled, and any held modifiers are released.
+# Start Vite development server
+npm run dev -- --host
+```
+
+### 3. Connect from Your Phone
+1. Connect your phone to the same Wi-Fi network as your laptop.
+2. Open your phone's browser and go to `http://<LAPTOP_LOCAL_IP>:5173`.
+3. Select **Local Wi-Fi Mode** and enter the 6-digit **PIN** displayed in the agent terminal.
+4. Tap **Start Stream** to view your desktop, and toggle **Enable Input** to control your laptop!
 
 ---
 
-## Automated Test Verification
+## Automated Tests
 
-Run the automated test suite in `laptop-agent/`:
+Run the test suite for each component to verify functionality:
+
+### Laptop Agent (Python / Pytest):
 ```powershell
 cd laptop-agent
 .\.venv\Scripts\pytest.exe -v
+# 66 passed in ~1.2s
 ```
 
-Run the automated test suite in `android-app/`:
+### Android Application:
 ```powershell
 cd android-app
 npm test
+# 12 passed in ~0.3s
 ```
 
-Run the frontend TypeScript & Vite production build:
+### Web Frontend (TypeScript Production Build):
 ```powershell
 cd frontend
 npm run build
+# Built cleanly with 0 type errors
 ```
 
-All test suites pass with **100% success** (66 Python tests + 12 Android unit tests + clean Vite build).
+---
+
+## Author
+
+**Gaurav Kumar Chaudhary**
+- GitHub: [@Gauravchaudhary76](https://github.com/Gauravchaudhary76)
+- LinkedIn: [Gaurav Chaudhary](https://www.linkedin.com/in/gaurav-chaudhary-5bb4982b7)
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

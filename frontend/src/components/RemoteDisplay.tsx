@@ -560,7 +560,7 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
                 <h3 className="text-base font-semibold text-white">
                   Windows Desktop Stream Ready
                 </h3>
-                <StageBadge stage={5} label="Stage 5 Interactive" variant="filled" />
+                <StageBadge stage={5} label="Live Interactive" variant="filled" />
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
                 Desktop capture starts strictly upon your explicit command. Starting the stream enables viewing and optional touch/mouse input control.
@@ -611,7 +611,7 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
                 <h3 className="text-base font-semibold text-white">
                   Remote Display Inactive
                 </h3>
-                <StageBadge stage={5} label="Stage 5" />
+                <StageBadge stage={5} label="Remote Input" />
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
                 Connect and authenticate with your Windows laptop agent over local Wi-Fi to start streaming your desktop and interact via touch controls.

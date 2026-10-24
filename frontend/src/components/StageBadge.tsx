@@ -7,11 +7,11 @@ interface StageBadgeProps {
 }
 
 export const StageBadge: React.FC<StageBadgeProps> = ({
-  stage,
+  stage: _stage,
   label,
   variant = 'subtle'
 }) => {
-  const text = label || `Stage ${stage} Feature`;
+  const text = label || 'Active';
 
   if (variant === 'filled') {
     return (

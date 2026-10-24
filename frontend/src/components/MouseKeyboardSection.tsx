@@ -144,7 +144,7 @@ export const MouseKeyboardSection: React.FC<MouseKeyboardSectionProps> = ({
               <h3 className="text-sm font-semibold text-white">
                 Mouse & Keyboard Controls
               </h3>
-              <StageBadge stage={5} label="Stage 5 Active" variant="filled" />
+              <StageBadge stage={5} label="Interactive Input" variant="filled" />
             </div>
             <p className="text-xs text-slate-400">
               Low-latency virtual trackpad and authenticated Windows input injection

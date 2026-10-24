@@ -114,7 +114,7 @@ export const AssistantSection: React.FC<AssistantSectionProps> = ({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <StageBadge stage={8} label="Stage 8 Feature" variant="filled" />
+          <StageBadge stage={8} label="AI Assistant" variant="filled" />
           <button
             type="button"
             onClick={() =>

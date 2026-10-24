@@ -1,13 +1,13 @@
 {
   "name": "pocketdesk-android",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "private": true,
   "description": "PocketDesk Android Application - Dedicated Mobile Interface for Windows Laptop Remote Access",
   "main": "index.js",
   "scripts": {
     "start": "react-native start",
     "android": "react-native run-android",
-    "test": "tsc --outDir build/test-out --module commonjs --target es2022 --noEmit false && node --test build/test-out/tests/*.test.js",
+    "test": "npx --package=typescript tsc --outDir build/test-out --module commonjs --target es2022 --noEmit false && node --test build/test-out/tests/*.test.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

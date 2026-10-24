@@ -99,7 +99,7 @@ export const SystemMonitorSection: React.FC<SystemMonitorSectionProps> = ({
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
           )}
-          <StageBadge stage={3} label="Stage 3 Active" variant="filled" />
+          <StageBadge stage={3} label="Live Telemetry" variant="filled" />
         </div>
       </div>
 
