@@ -45,14 +45,14 @@ export const App: React.FC = () => {
     return (localStorage.getItem('pocketdesk_connection_mode') as ConnectionMode) || 'local';
   });
 
-  // Configurable Agent URL
+  // Configurable Agent URL (automatically tracks current network host)
   const [agentUrl, setAgentUrl] = useState<string>(() => {
-    const saved = localStorage.getItem('pocketdesk_agent_url');
-    if (saved) return saved;
     const hostname = window.location.hostname;
     if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
       return `http://${hostname}:8000`;
     }
+    const saved = localStorage.getItem('pocketdesk_agent_url');
+    if (saved) return saved;
     return 'http://127.0.0.1:8000';
   });
 
