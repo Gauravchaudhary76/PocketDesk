@@ -8,9 +8,10 @@ import av
 from aiortc import RTCConfiguration, RTCIceServer, RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
 from aiortc.mediastreams import MediaStreamError
 import mss
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageGrab
 
 from app.services.turn import TurnService
+from app.services.win32_desktop import attach_to_default_desktop
 
 logger = logging.getLogger("pocketdesk.stream")
 
@@ -95,27 +96,35 @@ class DesktopVideoStreamTrack(VideoStreamTrack):
         return av.VideoFrame.from_image(img)
 
     def _capture_screen(self) -> av.VideoFrame:
-        """Capture active monitor frame via mss or fallback gracefully."""
+        """Capture active monitor frame via mss or ImageGrab fallback."""
         try:
+            attach_to_default_desktop()
+            img = None
+
             if self._sct is None:
-                self._sct = mss.mss()
+                self._sct = mss.MSS()
 
-            monitors = self._sct.monitors
-            monitor = monitors[1] if len(monitors) > 1 else monitors[0]
+            try:
+                monitors = self._sct.monitors
+                monitor = monitors[1] if len(monitors) > 1 else monitors[0]
+                sct_img = self._sct.grab(monitor)
+                img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
+            except Exception as mss_exc:
+                logger.debug("mss capture failed (%s); trying ImageGrab fallback", mss_exc)
+                attach_to_default_desktop()
+                img = ImageGrab.grab()
 
-            sct_img = self._sct.grab(monitor)
-            img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
-
-            if img.size != (self.target_width, self.target_height):
-                img = img.resize(
-                    (self.target_width, self.target_height), Image.BILINEAR
-                )
-
-            return av.VideoFrame.from_image(img)
+            if img is not None:
+                if img.size != (self.target_width, self.target_height):
+                    img = img.resize(
+                        (self.target_width, self.target_height), Image.BILINEAR
+                    )
+                return av.VideoFrame.from_image(img)
+            raise RuntimeError("Capture returned no image")
         except Exception as exc:
             if not self._logged_capture_error:
                 logger.warning(
-                    "Live GDI/desktop capture failed (%s). Emitting status frame (session locked or background service).",
+                    "Live desktop capture failed (%s). Emitting status frame.",
                     exc,
                 )
                 self._logged_capture_error = True

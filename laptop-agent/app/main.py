@@ -25,6 +25,7 @@ from app.services.auth import AuthService
 from app.services.devices import DeviceRegistry
 from app.services.input import InputService
 from app.services.stream import StreamManager
+from app.services.win32_desktop import attach_to_default_desktop
 
 # Setup application logging
 setup_logging()
@@ -38,6 +39,9 @@ async def lifespan(app: FastAPI):
 
     # Run security validation & display network endpoints
     settings.validate_security()
+
+    # Ensure attached to interactive desktop for screen capture and input injection
+    attach_to_default_desktop()
 
     # Initialize device registry and ensure pairing PINs are displayed
     DeviceRegistry.initialize(settings.STORAGE_DIR)
@@ -56,7 +60,7 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description=(
-        "PocketDesk Windows Laptop Agent (Stage 8). "
+        "PocketDesk Windows Laptop Agent. "
         "Provides authenticated WebRTC desktop streaming, remote mouse/keyboard control, "
         "restricted filesystem management, allowlisted app launching, and AI-assisted desktop command interface."
     ),

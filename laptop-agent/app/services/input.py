@@ -6,6 +6,8 @@ import sys
 import time
 from typing import Dict, List, Optional, Set, Tuple
 
+from app.services.win32_desktop import attach_to_default_desktop
+
 logger = logging.getLogger("pocketdesk.input")
 
 # Win32 Constants
@@ -161,8 +163,15 @@ class InputService:
         logger.info("==============================================================")
 
     @classmethod
+    def _ensure_desktop(cls) -> None:
+        """Ensure thread is attached to the interactive WinSta0\\Default desktop."""
+        if not cls._mock_mode and sys.platform == "win32":
+            attach_to_default_desktop()
+
+    @classmethod
     def emergency_cleanup(cls) -> None:
         """Safely release any stuck keys or held mouse buttons."""
+        cls._ensure_desktop()
         if cls._mock_mode or sys.platform != "win32":
             cls._held_keys.clear()
             cls._held_buttons.clear()
@@ -188,6 +197,7 @@ class InputService:
     @classmethod
     def get_screen_dimensions(cls) -> Tuple[int, int]:
         """Return width and height of the primary display."""
+        cls._ensure_desktop()
         if cls._mock_mode or sys.platform != "win32":
             return (1920, 1080)
         user32 = ctypes.windll.user32
@@ -227,6 +237,7 @@ class InputService:
         if not cls._check_rate_limit():
             return cls.get_cursor_position()
 
+        cls._ensure_desktop()
         target_x, target_y = cls.map_normalized_to_screen(norm_x, norm_y)
 
         if not cls._mock_mode and sys.platform == "win32":
@@ -242,6 +253,7 @@ class InputService:
         if not cls._check_rate_limit():
             return cls.get_cursor_position()
 
+        cls._ensure_desktop()
         curr_x, curr_y = cls.get_cursor_position()
         w, h = cls.get_screen_dimensions()
 
@@ -256,6 +268,7 @@ class InputService:
     @classmethod
     def get_cursor_position(cls) -> Tuple[int, int]:
         """Get current cursor position."""
+        cls._ensure_desktop()
         if cls._mock_mode or sys.platform != "win32":
             return (960, 540)
         pt = POINT()
@@ -275,6 +288,8 @@ class InputService:
             raise PermissionError("Remote input is disabled.")
         if not cls._check_rate_limit():
             return
+
+        cls._ensure_desktop()
 
         if norm_x is not None and norm_y is not None:
             cls.move_mouse_absolute(norm_x, norm_y)
@@ -322,12 +337,14 @@ class InputService:
         if not cls._check_rate_limit():
             return
 
+        cls._ensure_desktop()
         if not cls._mock_mode and sys.platform == "win32":
             ctypes.windll.user32.mouse_event(MOUSEEVENTF_WHEEL, 0, 0, delta_y, 0)
 
     @classmethod
     def _send_vk(cls, vk_code: int, action: str = "press") -> None:
         """Send virtual key down/up event via SendInput."""
+        cls._ensure_desktop()
         if cls._mock_mode or sys.platform != "win32":
             if action in ("down", "press"):
                 cls._held_keys.add(vk_code)
@@ -384,6 +401,7 @@ class InputService:
         if not cls._check_rate_limit():
             return
 
+        cls._ensure_desktop()
         if cls._mock_mode or sys.platform != "win32":
             return
 

@@ -5,6 +5,7 @@ import uvicorn
 
 from app.config import settings
 from app.services.auth import AuthService
+from app.services.win32_desktop import attach_to_default_desktop
 
 
 def parse_args():
@@ -52,7 +53,7 @@ def main():
     primary_ip = lan_ips[0] if lan_ips else "127.0.0.1"
 
     print("==================================================")
-    print(f"  {settings.APP_NAME} v{settings.APP_VERSION} (Stage {settings.STAGE})")
+    print(f"  {settings.APP_NAME} v{settings.APP_VERSION}")
     if bind_host == "0.0.0.0":
         print(f"  Mode: Local Wi-Fi Network Access enabled")
         print(f"  Listening on all interfaces: http://0.0.0.0:{args.port}")
@@ -65,6 +66,9 @@ def main():
     print(f"  >> PAIRING PIN: {pairing_code} <<")
     print("  Enter this 6-digit PIN on your phone to connect.")
     print("==================================================")
+
+    # Ensure process and thread are attached to interactive user desktop
+    attach_to_default_desktop()
 
     uvicorn.run(
         "app.main:app",

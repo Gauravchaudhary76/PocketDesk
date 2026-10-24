@@ -2,12 +2,14 @@ import os
 import shutil
 import logging
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 from fastapi import HTTPException, status
 
 from app.models.apps import AllowlistedAppItem, AppAllowlistResponse, LaunchAppResponse
+from app.services.win32_desktop import attach_to_default_desktop, get_desktop_startupinfo
 
 logger = logging.getLogger("pocketdesk.apps")
 
@@ -159,14 +161,17 @@ class AppLauncher:
             )
 
         try:
+            attach_to_default_desktop()
+            startupinfo = get_desktop_startupinfo()
+
             # Strictly shell=False to prevent command injection
             process = subprocess.Popen(
                 [exe_path],
+                startupinfo=startupinfo,
                 shell=False,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                start_new_session=True,
             )
 
             record = {

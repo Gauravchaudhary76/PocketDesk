@@ -16,6 +16,7 @@ from app.services.file_manager import file_manager
 from app.services.system_info import SystemInfoService
 from app.services.stream import StreamManager
 from app.services.security import SecurityAuditLogger
+from app.services.win32_desktop import capture_desktop_frame
 from app.models.assistant import (
     InterpretedCommandResponse,
     ExecuteCommandResponse,
@@ -516,23 +517,20 @@ class AssistantService:
 
     def _capture_desktop_screenshot(self) -> Dict[str, Any]:
         """Capture current Windows desktop frame and return as base64 PNG data URI."""
-        with mss.mss() as sct:
-            primary = sct.monitors[1] if len(sct.monitors) > 1 else sct.monitors[0]
-            raw = sct.grab(primary)
-            img = Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
+        img = capture_desktop_frame()
 
-            # Scale to safe preview dimensions (max width 1280)
-            orig_w, orig_h = img.size
-            if orig_w > 1280:
-                scale = 1280 / orig_w
-                img = img.resize((1280, int(orig_h * scale)), Image.Resampling.BILINEAR)
+        # Scale to safe preview dimensions (max width 1280)
+        orig_w, orig_h = img.size
+        if orig_w > 1280:
+            scale = 1280 / orig_w
+            img = img.resize((1280, int(orig_h * scale)), Image.Resampling.BILINEAR)
 
-            buf = io.BytesIO()
-            img.save(buf, format="JPEG", quality=85)
-            b64_data = base64.b64encode(buf.getvalue()).decode("utf-8")
-            data_uri = f"data:image/jpeg;base64,{b64_data}"
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        b64_data = base64.b64encode(buf.getvalue()).decode("utf-8")
+        data_uri = f"data:image/jpeg;base64,{b64_data}"
 
-            return {
+        return {
                 "image_data_uri": data_uri,
                 "width": img.width,
                 "height": img.height,
