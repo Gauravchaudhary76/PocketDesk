@@ -23,13 +23,11 @@ import { inputClient } from './services/input';
 import { remoteClient } from './services/remote';
 import {
   Monitor,
-  Mouse,
   FolderUp,
   LayoutGrid,
   Activity,
   Sparkles,
   ChevronRight,
-  Info,
   Globe,
   Hand,
   ShieldCheck,
@@ -536,8 +534,7 @@ export const App: React.FC = () => {
   };
 
   const tabs: { id: ActiveTab; label: string; icon: React.FC<{ className?: string }> }[] = [
-    { id: 'display', label: 'Screen', icon: Monitor },
-    { id: 'controls', label: 'Controls', icon: Mouse },
+    { id: 'display', label: 'Screen & Mouse', icon: Monitor },
     { id: 'assistant', label: 'AI Assistant', icon: Sparkles },
     { id: 'files', label: 'Files', icon: FolderUp },
     { id: 'apps', label: 'Apps', icon: LayoutGrid },
@@ -721,6 +718,7 @@ export const App: React.FC = () => {
               onToggleInput={handleToggleInput}
               onToggleKeyboard={() => setIsKeyboardOpen((prev) => !prev)}
               onMouseMove={handleMouseMove}
+              onMouseMoveRelative={handleMouseMoveRelative}
               onMouseClick={handleMouseClick}
               onMouseScroll={handleMouseScroll}
               onSendKey={handleSendKey}
@@ -773,7 +771,7 @@ export const App: React.FC = () => {
 
         {/* Mobile Layout: Responsive Tab-switched View for Phone Ergonomics */}
         <div className="md:hidden space-y-4">
-          {activeTab === 'display' && (
+          {(activeTab === 'display' || (activeTab as string) === 'controls') && (
             <div className="space-y-4">
               <RemoteDisplay
                 status={connectionStatus}
@@ -793,6 +791,7 @@ export const App: React.FC = () => {
                 onToggleInput={handleToggleInput}
                 onToggleKeyboard={() => setIsKeyboardOpen((prev) => !prev)}
                 onMouseMove={handleMouseMove}
+                onMouseMoveRelative={handleMouseMoveRelative}
                 onMouseClick={handleMouseClick}
                 onMouseScroll={handleMouseScroll}
                 onSendKey={handleSendKey}
@@ -800,26 +799,7 @@ export const App: React.FC = () => {
                 onSendShortcut={handleSendShortcut}
                 onOpenInfo={handleOpenInfo}
               />
-              <div className="p-3 bg-slate-900/70 border border-slate-800 rounded-xl text-xs text-slate-400 flex items-center gap-2">
-                <Info className="w-4 h-4 text-blue-400 shrink-0" />
-                <span>Switch to Controls tab for virtual trackpad or open virtual keyboard.</span>
-              </div>
             </div>
-          )}
-
-          {activeTab === 'controls' && (
-            <MouseKeyboardSection
-              isInputEnabled={isInputEnabled}
-              isConnected={connectionStatus === 'connected'}
-              onToggleInput={handleToggleInput}
-              onOpenInfo={handleOpenInfo}
-              onMouseMoveRelative={handleMouseMoveRelative}
-              onMouseClick={handleMouseClick}
-              onMouseScroll={handleMouseScroll}
-              onSendKey={handleSendKey}
-              onSendText={handleSendText}
-              onSendShortcut={handleSendShortcut}
-            />
           )}
 
           {activeTab === 'assistant' && (

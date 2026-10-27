@@ -8,15 +8,17 @@ import {
   Maximize2,
   Minimize2,
   Settings,
-  ShieldCheck,
-  ShieldAlert,
   Power,
   Sliders,
   Tv,
   Info,
   Keyboard,
   MousePointer,
-  Hand
+  Hand,
+  Mouse,
+  Touchpad,
+  Send,
+  Sparkles,
 } from 'lucide-react';
 import type { ConnectionStatus, StreamResolution } from '../types';
 import { StageBadge } from './StageBadge';
@@ -41,6 +43,7 @@ interface RemoteDisplayProps {
   onToggleInput: (enabled: boolean) => void;
   onToggleKeyboard: () => void;
   onMouseMove: (normX: number, normY: number) => void;
+  onMouseMoveRelative?: (dx: number, dy: number) => void;
   onMouseClick: (
     button: 'left' | 'right' | 'middle',
     action?: 'click' | 'double_click' | 'down' | 'up',
@@ -72,6 +75,7 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
   onToggleInput,
   onToggleKeyboard,
   onMouseMove,
+  onMouseMoveRelative,
   onMouseClick,
   onMouseScroll,
   onSendKey,
@@ -84,13 +88,26 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
-  // Gesture tracking refs
+  // Input control configuration: 'touch' (direct on video) vs 'trackpad' (dedicated surface below screen)
+  const [controlMode, setControlMode] = useState<'touch' | 'trackpad'>('touch');
+  const [isDragLock, setIsDragLock] = useState<boolean>(false);
+  const [trackpadSensitivity, setTrackpadSensitivity] = useState<number>(1.2);
+  const [showSensitivity, setShowSensitivity] = useState<boolean>(false);
+  const [showShortcuts, setShowShortcuts] = useState<boolean>(false);
+  const [typedText, setTypedText] = useState<string>('');
+
+  // Direct touch gesture tracking refs (on video viewport)
   const pointerDownRef = useRef<boolean>(false);
   const startPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const lastNormPosRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
   const touchStartTimeRef = useRef<number>(0);
   const longPressTimerRef = useRef<number | null>(null);
   const isDraggingRef = useRef<boolean>(false);
+
+  // Trackpad gesture tracking refs (on dedicated trackpad area)
+  const trackpadLastPosRef = useRef<{ x: number; y: number } | null>(null);
+  const trackpadStartPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const trackpadStartRef = useRef<number>(0);
 
   // Monitor fullscreen state changes
   useEffect(() => {
@@ -135,7 +152,7 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
     }
   };
 
-  // Touch and pointer interaction on the video canvas
+  // Direct touch and pointer interaction on the video canvas
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isStreaming || !isInputEnabled || !viewportRef.current) return;
 
@@ -229,6 +246,80 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
     onMouseScroll(delta);
   };
 
+  // Trackpad gesture handlers (relative motion on dedicated surface below screen)
+  const handleTrackpadPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isInputEnabled) return;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    trackpadLastPosRef.current = { x: e.clientX, y: e.clientY };
+    trackpadStartPosRef.current = { x: e.clientX, y: e.clientY };
+    trackpadStartRef.current = performance.now();
+  };
+
+  const handleTrackpadPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isInputEnabled || !trackpadLastPosRef.current) return;
+    const dx = (e.clientX - trackpadLastPosRef.current.x) * trackpadSensitivity;
+    const dy = (e.clientY - trackpadLastPosRef.current.y) * trackpadSensitivity;
+    trackpadLastPosRef.current = { x: e.clientX, y: e.clientY };
+
+    if (onMouseMoveRelative) {
+      onMouseMoveRelative(dx, dy);
+    }
+  };
+
+  const handleTrackpadPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isInputEnabled || !trackpadLastPosRef.current) return;
+    try {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+
+    const elapsed = performance.now() - trackpadStartRef.current;
+    const moveDist = Math.hypot(
+      e.clientX - trackpadStartPosRef.current.x,
+      e.clientY - trackpadStartPosRef.current.y
+    );
+
+    // Tap detection: short tap with minimal movement (< 6px) triggers left click
+    if (elapsed < 280 && moveDist < 6) {
+      onMouseClick('left', 'click');
+    }
+
+    trackpadLastPosRef.current = null;
+  };
+
+  // Drag lock toggle
+  const toggleDragLock = () => {
+    if (!isInputEnabled) return;
+    if (!isDragLock) {
+      onMouseClick('left', 'down');
+      setIsDragLock(true);
+    } else {
+      onMouseClick('left', 'up');
+      setIsDragLock(false);
+    }
+  };
+
+  // Quick text dispatch
+  const handleTextSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!typedText.trim() || !isInputEnabled) return;
+    onSendText(typedText);
+    setTypedText('');
+  };
+
+  const hotkeys = [
+    { label: 'Alt+Tab', desc: 'Switch Window', action: () => onSendShortcut(['alt', 'tab']) },
+    { label: 'Win + D', desc: 'Show Desktop', action: () => onSendShortcut(['win', 'd']) },
+    { label: 'Win + E', desc: 'File Explorer', action: () => onSendShortcut(['win', 'e']) },
+    { label: 'Ctrl + C', desc: 'Copy', action: () => onSendShortcut(['ctrl', 'c']) },
+    { label: 'Ctrl + V', desc: 'Paste', action: () => onSendShortcut(['ctrl', 'v']) },
+    { label: 'Esc', desc: 'Escape', action: () => onSendKey('escape') },
+    { label: 'Enter', desc: 'Enter', action: () => onSendKey('enter') },
+    { label: 'Tab', desc: 'Next Field', action: () => onSendKey('tab') },
+    { label: 'Win + R', desc: 'Run Dialog', action: () => onSendShortcut(['win', 'r']) },
+  ];
+
   return (
     <div
       ref={containerRef}
@@ -277,7 +368,7 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
                 )}
               </>
             ) : (
-              <span>Display 1: Windows Host Virtual Viewport</span>
+              <span>Windows Host Virtual Viewport</span>
             )}
           </span>
         </div>
@@ -287,7 +378,7 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
           <div className="hidden sm:flex items-center gap-3 font-mono text-[11px] text-slate-400 mr-2">
             <span>RTC: {webrtcState}</span>
             <span>FPS: {streamFps}</span>
-            <span>Input: {isInputEnabled ? 'Enabled' : 'Disabled'}</span>
+            <span>Input: {isInputEnabled ? 'Active' : 'Disabled'}</span>
           </div>
 
           {/* Architecture info button */}
@@ -296,19 +387,19 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
             onClick={() =>
               onOpenInfo(
                 5,
-                'Stage 5 Remote Input Architecture & Win32 Injection',
+                'Remote Input Architecture & Win32 Injection',
                 'PocketDesk transmits touch gestures, relative trackpad motions, and keyboard keystrokes to your Windows laptop using low-latency WebSockets and Win32 SendInput.',
                 [
-                  'Touch-to-Screen Mapping: Client calculates letterbox/pillarbox offsets and normalizes coordinates [0.0, 1.0].',
-                  'Win32 Input Injection: ctypes interface to SetCursorPos, mouse_event, and SendInput.',
-                  'Unicode Text Support: SendInput KEYEVENTF_UNICODE handles arbitrary international characters.',
-                  'Safety Kill Switch: Immediate disable button releases all held keys and mouse buttons.',
-                  'UIPI Restriction: Windows Secure Desktop (Ctrl+Alt+Del, UAC prompts) cannot be controlled by non-elevated apps.'
+                  'Unified Control: View live desktop video while interacting with mouse and keyboard controls on the same screen.',
+                  'Direct Touch: Touch directly on the screen to click and drag.',
+                  'Virtual Trackpad: Drag on the touchpad surface below the display for high-precision cursor tracking.',
+                  'Win32 Input Injection: ctypes interface calling SetCursorPos, mouse_event, and SendInput.',
+                  'Safety Kill Switch: Immediate disable button releases all held keys and mouse buttons.'
                 ]
               )
             }
             className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
-            title="Stage 5 Architecture Info"
+            title="Architecture Info"
             aria-label="Architecture Info"
           >
             <Info className="w-3.5 h-3.5" />
@@ -358,16 +449,16 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
                 className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-blue-500 disabled:opacity-50"
               >
                 <option value="1080p">1080p (1920×1080 Native)</option>
-                <option value="720p">720p (1280×720 Recommended)</option>
-                <option value="540p">540p (960×540 Low Bandwidth)</option>
-                <option value="480p">480p (854×480 Minimal CPU)</option>
+                <option value="720p">720p (1280×720 HD)</option>
+                <option value="540p">540p (960×540 Medium)</option>
+                <option value="480p">480p (854×480 Low Bandwidth)</option>
               </select>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-slate-400">Frame Rate:</span>
-              <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded-lg p-0.5">
-                {[15, 20, 30].map((fps) => (
+              <span className="text-slate-400">Paced FPS:</span>
+              <div className="flex items-center bg-slate-900 border border-slate-700 rounded-lg p-0.5">
+                {[15, 20, 30, 60].map((fps) => (
                   <button
                     key={fps}
                     type="button"
@@ -375,7 +466,7 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
                     onClick={() => onFpsChange(fps)}
                     className={`px-2 py-0.5 rounded text-xs transition-colors cursor-pointer ${
                       streamFps === fps
-                        ? 'bg-blue-600 text-white font-semibold'
+                        ? 'bg-blue-600 text-white font-medium shadow-sm'
                         : 'text-slate-400 hover:text-slate-200'
                     } disabled:opacity-50`}
                   >
@@ -488,23 +579,6 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
           </div>
         )}
 
-        {/* In-Stream Bottom Input Status Pill */}
-        {isStreaming && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-slate-950/80 border border-slate-800 text-[11px] backdrop-blur-md flex items-center gap-1.5 pointer-events-none z-20">
-            {isInputEnabled ? (
-              <>
-                <MousePointer className="w-3 h-3 text-emerald-400" />
-                <span className="text-emerald-300 font-medium">Touch to click & drag • Long-press for right-click</span>
-              </>
-            ) : (
-              <>
-                <ShieldAlert className="w-3 h-3 text-amber-400" />
-                <span className="text-slate-400">View Only • Enable remote input above to interact</span>
-              </>
-            )}
-          </div>
-        )}
-
         {/* State: NEGOTIATING / STARTING STREAM */}
         {isStartingStream && (
           <div className="max-w-md flex flex-col items-center z-10 space-y-4">
@@ -520,7 +594,7 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
                 Starting Screen Share...
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Initiating authenticated WebRTC handshake with Windows agent and gathering local network ICE candidates.
+                Initiating authenticated WebRTC handshake with Windows agent...
               </p>
             </div>
 
@@ -563,7 +637,7 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
                 <StageBadge stage={5} label="Live Interactive" variant="filled" />
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Desktop capture starts strictly upon your explicit command. Starting the stream enables viewing and optional touch/mouse input control.
+                Start screen streaming to view your desktop and control your mouse and keyboard simultaneously.
               </p>
             </div>
 
@@ -589,13 +663,6 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
               <Play className="w-4 h-4 fill-current" />
               <span>Start Screen Sharing</span>
             </button>
-
-            <div className="p-2.5 bg-slate-900/60 rounded-xl border border-slate-800/70 text-[11px] text-slate-400 text-left w-full flex items-start gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-              <span>
-                Direct WebRTC peer connection with zero external cloud relays. Remote input requires explicit enablement and can be terminated instantly.
-              </span>
-            </div>
           </div>
         )}
 
@@ -614,7 +681,7 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
                 <StageBadge stage={5} label="Remote Input" />
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Connect and authenticate with your Windows laptop agent over local Wi-Fi to start streaming your desktop and interact via touch controls.
+                Connect and authenticate with your Windows laptop to stream your screen and control your mouse.
               </p>
             </div>
           </div>
@@ -635,7 +702,7 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
                 Connecting to Laptop Host...
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Verifying agent availability and preparing secure local network session...
+                Verifying agent availability and preparing secure session...
               </p>
             </div>
           </div>
@@ -659,6 +726,274 @@ export const RemoteDisplay: React.FC<RemoteDisplayProps> = ({
           </div>
         )}
       </div>
+
+      {/* ========================================================================= */}
+      {/* UNIFIED MOUSE & KEYBOARD CONTROL DECK (Directly Attached Under Viewport)   */}
+      {/* ========================================================================= */}
+      {!isFullscreen && (
+        <div className="bg-slate-950 border-t border-slate-800 p-4 sm:p-5 space-y-4">
+          {/* Top Control Bar: Input Mode Selector & Action Buttons */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+            {/* Input Mode Selector: Direct Screen Touch vs Dedicated Trackpad */}
+            <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setControlMode('touch')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  controlMode === 'touch'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Tap and drag directly on the video screen"
+              >
+                <MousePointer className="w-3.5 h-3.5" />
+                <span>Screen Touch</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setControlMode('trackpad')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  controlMode === 'trackpad'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Use trackpad zone below display so fingers do not block your view"
+              >
+                <Touchpad className="w-3.5 h-3.5" />
+                <span>Trackpad Deck</span>
+              </button>
+            </div>
+
+            {/* Quick Actions: Keyboard, Shortcuts & Sensitivity */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onToggleKeyboard}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors cursor-pointer ${
+                  isKeyboardOpen
+                    ? 'bg-indigo-600 border-indigo-400 text-white shadow-md'
+                    : 'bg-slate-900 hover:bg-slate-850 border-slate-800 text-slate-300'
+                }`}
+                title="Toggle On-Screen Virtual Keyboard"
+              >
+                <Keyboard className="w-3.5 h-3.5" />
+                <span>Keyboard</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowShortcuts((prev) => !prev)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors cursor-pointer ${
+                  showShortcuts
+                    ? 'bg-purple-600 border-purple-400 text-white shadow-md'
+                    : 'bg-slate-900 hover:bg-slate-850 border-slate-800 text-slate-300'
+                }`}
+                title="Toggle Windows Shortcuts"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Shortcuts</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowSensitivity((prev) => !prev)}
+                className="p-1.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                title="Trackpad Sensitivity"
+              >
+                <Sliders className="w-4 h-4 text-cyan-400" />
+              </button>
+            </div>
+          </div>
+
+          {/* Sensitivity Slider (Collapsible) */}
+          {showSensitivity && (
+            <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center gap-3 text-xs">
+              <span className="text-slate-400 text-xs font-medium">Trackpad Speed:</span>
+              <input
+                type="range"
+                min="0.5"
+                max="2.5"
+                step="0.1"
+                value={trackpadSensitivity}
+                onChange={(e) => setTrackpadSensitivity(parseFloat(e.target.value))}
+                className="flex-1 accent-blue-500 cursor-pointer"
+              />
+              <span className="font-mono text-cyan-300 font-semibold text-xs w-10">
+                {trackpadSensitivity}x
+              </span>
+            </div>
+          )}
+
+          {/* Trackpad Mode Surface (rendered when trackpad mode is selected) */}
+          {controlMode === 'trackpad' && (
+            <div className="space-y-2">
+              <div
+                onPointerDown={handleTrackpadPointerDown}
+                onPointerMove={handleTrackpadPointerMove}
+                onPointerUp={handleTrackpadPointerUp}
+                onPointerCancel={handleTrackpadPointerUp}
+                className={`relative h-36 sm:h-44 w-full rounded-2xl border-2 flex flex-col items-center justify-center p-4 transition-all touch-none select-none ${
+                  isInputEnabled
+                    ? 'bg-slate-900/90 border-slate-700/80 hover:border-blue-500/60 cursor-crosshair active:bg-slate-900 shadow-inner'
+                    : 'bg-slate-950/60 border-dashed border-slate-800/80 cursor-not-allowed opacity-60'
+                }`}
+              >
+                {isInputEnabled ? (
+                  <div className="flex flex-col items-center text-center space-y-1 pointer-events-none">
+                    <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-cyan-400 shadow-md">
+                      <Mouse className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <p className="text-xs font-semibold text-slate-200">
+                      Trackpad Surface Active
+                    </p>
+                    <p className="text-[11px] text-slate-400 max-w-xs">
+                      Slide your thumb here to glide the cursor on the screen above • Tap = Left Click
+                    </p>
+                    {isDragLock && (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-semibold border border-amber-500/40">
+                        Drag Lock Active (Left Button Down)
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center text-center space-y-1 pointer-events-none">
+                    <Mouse className="w-6 h-6 text-slate-600 mb-1" />
+                    <p className="text-xs font-medium text-slate-400">
+                      Trackpad Input Disabled
+                    </p>
+                    <p className="text-[11px] text-slate-500 max-w-xs">
+                      Tap "Enable Input" above to authorize mouse control.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Tactile Mouse Click Buttons Bar (Left Click, Drag Lock, Middle, Right, Scroll) */}
+          <div className="grid grid-cols-6 gap-2">
+            {/* Primary Left Click */}
+            <button
+              type="button"
+              disabled={!isInputEnabled}
+              onClick={() => onMouseClick('left', 'click')}
+              className="col-span-2 py-3 px-3 rounded-xl bg-blue-600/90 hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 text-xs font-bold text-white shadow-md shadow-blue-600/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <MousePointer className="w-3.5 h-3.5" />
+              <span>Left Click</span>
+            </button>
+
+            {/* Drag Lock */}
+            <button
+              type="button"
+              disabled={!isInputEnabled}
+              onClick={toggleDragLock}
+              className={`py-3 px-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer disabled:opacity-40 flex items-center justify-center text-center ${
+                isDragLock
+                  ? 'bg-amber-950/80 border-amber-500/80 text-amber-200 shadow-md shadow-amber-900/30'
+                  : 'bg-slate-900 border-slate-800 hover:bg-slate-850 text-slate-300'
+              }`}
+              title="Hold left mouse button down to drag windows or highlight text"
+            >
+              <span>{isDragLock ? 'Release Drag' : 'Drag Lock'}</span>
+            </button>
+
+            {/* Middle Click */}
+            <button
+              type="button"
+              disabled={!isInputEnabled}
+              onClick={() => onMouseClick('middle', 'click')}
+              className="py-3 px-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-850 active:bg-slate-800 disabled:opacity-40 text-xs font-semibold text-slate-300 transition-all cursor-pointer text-center"
+            >
+              <span>Middle</span>
+            </button>
+
+            {/* Right Click */}
+            <button
+              type="button"
+              disabled={!isInputEnabled}
+              onClick={() => onMouseClick('right', 'click')}
+              className="col-span-2 py-3 px-3 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-850 active:bg-slate-800 disabled:opacity-40 text-xs font-bold text-slate-200 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <span>Right Click</span>
+            </button>
+          </div>
+
+          {/* Vertical Scroll & Navigation Buttons */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={!isInputEnabled}
+              onClick={() => onMouseScroll(120)}
+              className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800/80 text-xs font-medium text-slate-300 transition-colors disabled:opacity-40 cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <span>▲ Scroll Up</span>
+            </button>
+            <button
+              type="button"
+              disabled={!isInputEnabled}
+              onClick={() => onMouseScroll(-120)}
+              className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800/80 text-xs font-medium text-slate-300 transition-colors disabled:opacity-40 cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <span>▼ Scroll Down</span>
+            </button>
+          </div>
+
+          {/* Quick Windows Shortcuts Bar (Collapsible) */}
+          {showShortcuts && (
+            <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-2">
+              <span className="text-[11px] font-semibold text-slate-300 block">
+                Windows Keyboard Shortcuts:
+              </span>
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                {hotkeys.map((hk) => (
+                  <button
+                    key={hk.label}
+                    type="button"
+                    disabled={!isInputEnabled}
+                    onClick={hk.action}
+                    className="p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 hover:bg-slate-850 text-center transition-all cursor-pointer disabled:opacity-40"
+                  >
+                    <span className="font-mono text-xs font-bold text-slate-200 block">
+                      {hk.label}
+                    </span>
+                    <span className="text-[9px] text-slate-400 truncate block">
+                      {hk.desc}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Quick Text Input Dispatch */}
+          <form onSubmit={handleTextSubmit} className="pt-1">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={typedText}
+                disabled={!isInputEnabled}
+                onChange={(e) => setTypedText(e.target.value)}
+                placeholder={
+                  isInputEnabled
+                    ? 'Type text here to inject directly into active Windows window...'
+                    : 'Enable remote input to type...'
+                }
+                className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+              />
+              <button
+                type="submit"
+                disabled={!isInputEnabled || !typedText.trim()}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-xs font-semibold text-white flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/30 shrink-0 cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Send</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* On-Screen Virtual Keyboard Drawer */}
       <VirtualKeyboard
